@@ -37,7 +37,7 @@ dev: build-frontend run ## build UI then start
 
 package: build-frontend ## one-file binary with embedded UI (PyInstaller)
 	$(PIP) install --quiet pyinstaller
-	$(VENV)/bin/pyinstaller packaging/meshdeck.spec --distpath dist --workpath build --noconfirm
+	$(VENV)/bin/pyinstaller packaging/pyinstaller.spec --distpath dist --workpath build --noconfirm
 	@echo ""
 	@echo "Binary: dist/meshdeck   (serve it, run: ./dist/meshdeck)"
 

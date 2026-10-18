@@ -91,12 +91,16 @@ address from one instance's Settings screen in the other's "add peer" field.
 ### Or download a release binary
 
 The [v0.1.1 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.1)
-ships two Linux x86_64 artifacts, with `SHA256SUMS`:
+ships three Linux x86_64 artifacts, with `SHA256SUMS`:
 
 - `meshdeck-0.1.1-x86_64.tar.gz` — extract and run the `meshdeck` binary inside
 - `meshdeck-0.1.1-x86_64.AppImage` — `chmod +x` and run it directly
+- `meshdeck-0.1.1-1.x86_64.rpm` — Fedora/RHEL-family package:
+  `sudo dnf install ./meshdeck-0.1.1-1.x86_64.rpm`
 
-The web UI is embedded, so neither needs Python installed. Flatpak is **not**
+All three embed the web UI, so none needs Python installed. The RPM is
+unsigned and, like the other binaries, built against this host's glibc; it
+targets Fedora-family systems of the same architecture. Flatpak is **not**
 published: the manifest in `packaging/flatpak/` has never been built
 (`flatpak-builder` was unavailable), and `packaging/README.md` says so.
 

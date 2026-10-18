@@ -13,10 +13,11 @@ PyInstaller 6.22.3 / Python 3.14.8:
 |---|---|---|
 | Tarball | `packaging/release.sh` | **verified**: built, checksummed, extracted, binary ran, UI + API served |
 | AppImage | `packaging/appimage.sh` | **verified**: built with appimagetool continuous build 313 (auto-downloaded), `--version`, UI + API served |
+| RPM | `packaging/rpm.sh` | **verified**: built (Fedora 44, rpmbuild obtained user-level), `rpm -qip`/`-qlp`, extracted with `rpm2cpio`, binary prints the release version |
 | Flatpak | `packaging/flatpak/org.meshdeck.MeshDeck.yml` | **UNVERIFIED**: `flatpak-builder` is not installed on this host; manifest never built |
 | Source | `make install && make dev` | documented in the top-level README, not re-verified by this packaging work |
 
-The tarball and AppImage are built against the host's glibc. They are not
+The tarball, AppImage and RPM are built against the host's glibc. They are not
 portable to older distributions; Flatpak is the intended portable format once
 its manifest is verified.
 
@@ -113,6 +114,62 @@ On this host the AppImage was launched directly (FUSE available), reported
 `meshdeck 0.1.0.dev0`, and served `GET /` and `GET /api/v1/status` with `200`.
 The build warns that AppStream metadata is missing; that is cosmetic. Without
 FUSE, run it with `APPIMAGE_EXTRACT_AND_RUN=1`.
+
+## RPM (Fedora, verified on this host)
+
+`packaging/meshdeck.spec` is the **RPM** spec. The PyInstaller spec moved to
+`packaging/pyinstaller.spec` (`make package` uses it) when the RPM spec took the
+historical name.
+
+```bash
+./packaging/rpm.sh
+```
+
+The script builds the frontend and `make package`, stages a source tarball
+rooted at `meshdeck-<version>/`, runs `rpmbuild -bb`, and writes:
+
+- `dist/meshdeck-<version>-1.<arch>.rpm` (`<arch>` = `uname -m`, no hardcoded
+  `x86_64`)
+- a `dist/SHA256SUMS` line, replacing any previous line for that artifact
+
+If `rpmbuild` is not installed, `rpm.sh` attempts a **user-level** route:
+`dnf download rpm-build`, extract it under `build/tools/rpmuser`, overlay the
+system `/usr/lib/rpm` config and run it with `RPM_CONFIGDIR`. This host had no
+`rpmbuild` and no root, and that route produced a real RPM. If the route
+fails, the script exits non-zero and makes **no** artifact. `RPMBUILD=/path`
+overrides the binary.
+
+Install (Fedora/RHEL-family):
+
+```bash
+sudo dnf install ./meshdeck-<version>-1.<arch>.rpm
+meshdeck --open-browser
+```
+
+The package is **unsigned** and **targets the build host's glibc and
+architecture**. Auto-generated ELF `Requires` are kept (they are correct for the
+bundled one-file binary). The spec deliberately disables the debuginfo
+subpackage (`%global debug_package %{nil}`) because there is no source build.
+
+Exact verification recipe:
+
+```bash
+VERSION=0.1.1
+ARCH=$(uname -m)
+rpm -qip dist/meshdeck-$VERSION-1.$ARCH.rpm
+rpm -qlp dist/meshdeck-$VERSION-1.$ARCH.rpm
+TMP=$(mktemp -d)
+(cd "$TMP" && rpm2cpio "$OLDPWD/dist/meshdeck-$VERSION-1.$ARCH.rpm" | cpio -idm)
+"$TMP"/usr/bin/meshdeck --version
+```
+
+Verified here: `rpm -qip` reports `Version: 0.1.1`, `License: MIT`,
+`Signature: (none)`; `rpm -qlp` lists `/usr/bin/meshdeck`,
+`/usr/share/applications/meshdeck.desktop`,
+`/usr/share/icons/hicolor/scalable/apps/meshdeck.svg`,
+`/usr/share/doc/meshdeck/README.md`, `/usr/share/licenses/meshdeck-0.1.1/LICENSE`;
+the extracted binary prints `meshdeck 0.1.1`. The artifact is
+`meshdeck-0.1.1-1.x86_64.rpm` (~23 MB).
 
 ## Flatpak (UNVERIFIED)
 

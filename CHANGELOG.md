@@ -42,6 +42,23 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
   acceptance test, and a real-daemon probe (log rotation + `/status` usage
   changing after writes).
 
+### Added (Phase 7.2 — Fedora RPM)
+
+- `packaging/meshdeck.spec` (RPM) and `packaging/rpm.sh`: build the frontend +
+  one-file binary, stage a `meshdeck-<version>/` source tarball, run
+  `rpmbuild -bb`, and write `dist/meshdeck-<version>-1.<arch>.rpm` plus a
+  `SHA256SUMS` line. The architecture comes from `uname -m`; ELF `Requires`
+  stay auto-generated; the package is unsigned and targets the build host's
+  glibc. If `rpmbuild` is absent the script tries a user-level
+  `dnf download rpm-build` + extraction route, and fails cleanly (no fake RPM)
+  if that is impossible. The former PyInstaller spec is now
+  `packaging/pyinstaller.spec`; `make package` follows the rename.
+- Verified on this host (Fedora 44): the user-level route built
+  `meshdeck-0.1.1-1.x86_64.rpm`, `rpm -qip`/`rpm -qlp` are correct, and the
+  RPM extracted with `rpm2cpio | cpio` runs `usr/bin/meshdeck --version` →
+  `meshdeck 0.1.1`. `packaging/README.md` and the top-level README document
+  the install command and the unsigned/glibc caveats.
+
 ## [0.1.1] - 2026-10-19
 
 ### Added (Phase 6 — post-release hardening)

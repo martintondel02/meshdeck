@@ -1,68 +1,58 @@
-# PyInstaller spec for a one-file MeshDeck binary.
-# Build with: make package   (frontend/dist must be built first)
+# RPM spec for MeshDeck (Fedora and other RPM distributions).
+#
+# Build with packaging/rpm.sh, which:
+#   * builds the frontend and the PyInstaller one-file binary,
+#   * stages a source tarball rooted at meshdeck-<version>/,
+#   * runs `rpmbuild -bb` on this spec and copies the RPM to dist/.
+#
+# The version comes from meshdeck/version.py via --define on the rpmbuild
+# command line (single source of truth); the fallback below only keeps the spec
+# syntactically usable with plain `rpmspec`.
+%{!?meshdeck_version:%global meshdeck_version 0.1.1}
 
-import pathlib
+Name:           meshdeck
+Version:        %{meshdeck_version}
+Release:        1
+Summary:        All-in-one Reticulum application for chat, files, pages and hosting
+License:        MIT
+URL:            https://github.com/martintondel02/meshdeck
+Source0:        meshdeck-%{version}.tar.gz
+# The package ships a prebuilt one-file binary; there is no source build here.
+# Keep rpm's automatic ELF dependency generation intact (it is correct for the
+# bundled PyInstaller binary), but do not try to build a debuginfo subpackage.
+%global debug_package %{nil}
 
-ROOT = pathlib.Path(SPECPATH).parent  # repo root when invoked from repo root
+%description
+MeshDeck is a native Reticulum application for messaging (LXMF), file
+sharing, NomadNet-compatible page hosting, and propagation-node hosting.
+It runs a local daemon and serves its web UI on 127.0.0.1 only.
 
-block_cipher = None
+This package is unsigned and is built for the glibc/architecture of the host
+that produced it; it is not a portable AppImage or Flatpak.
 
-# Every RNS interface module must be frozen in: Reticulum binds interface
-# classes via `from RNS.Interfaces import *`, and star-import binding depends
-# on what other modules have already loaded. The shim additionally
-# force-imports them so ordering is guaranteed regardless.
-RNS_IFACE_MODULES = [
-    "RNS.Interfaces.Interface",
-    "RNS.Interfaces.LocalInterface",
-    "RNS.Interfaces.AutoInterface",
-    "RNS.Interfaces.TCPInterface",
-    "RNS.Interfaces.BackboneInterface",
-    "RNS.Interfaces.UDPInterface",
-    "RNS.Interfaces.I2PInterface",
-    "RNS.Interfaces.RNodeInterface",
-    "RNS.Interfaces.RNodeMultiInterface",
-    "RNS.Interfaces.KISSInterface",
-    "RNS.Interfaces.SerialInterface",
-    "RNS.Interfaces.AX25KISSInterface",
-    "RNS.Interfaces.PipeInterface",
-    "RNS.Interfaces.WeaveInterface",
-]
+%prep
+%setup -q
 
-a = Analysis(
-    [str(ROOT / "packaging" / "meshdeck_main.py")],
-    pathex=[str(ROOT)],
-    binaries=[],
-    datas=[
-        # embed the built web UI so the binary is fully self-contained
-        (str(ROOT / "frontend" / "dist"), "frontend/dist"),
-    ],
-    hiddenimports=[
-        *RNS_IFACE_MODULES,
-        "RNS.vendor.configobj",
-        "RNS.vendor.umsgpack",
-        "aiohttp.web",
-        "msgpack",
-    ],
-    hookspath=[],
-    runtime_hooks=[],
-    excludes=["pytest", "ruff"],
-    cipher=block_cipher,
-    noarchive=False,
-)
+%build
+# The binary is produced by packaging/release.sh / `make package` before this
+# spec runs; assert it is present instead of silently packaging nothing.
+test -x meshdeck
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+%install
+install -Dm 0755 meshdeck %{buildroot}%{_bindir}/meshdeck
+install -Dm 0644 meshdeck.desktop %{buildroot}%{_datadir}/applications/meshdeck.desktop
+install -Dm 0644 meshdeck.svg \
+    %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/meshdeck.svg
+# Explicit path (Fedora's %doc would version it as meshdeck-<version>).
+install -Dm 0644 README.md %{buildroot}%{_docdir}/meshdeck/README.md
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name="meshdeck",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    console=True,
-)
+%files
+%{_bindir}/meshdeck
+%{_datadir}/applications/meshdeck.desktop
+%{_datadir}/icons/hicolor/scalable/apps/meshdeck.svg
+%{_docdir}/meshdeck/README.md
+%license LICENSE
+
+%changelog
+* Mon Oct 19 2026 MeshDeck contributors <noreply@example.invalid> - 0.1.1-1
+- Initial RPM packaging for the MeshDeck one-file release binary.
