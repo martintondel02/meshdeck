@@ -2,95 +2,188 @@
 
 [![CI](https://github.com/martintondel02/meshdeck/actions/workflows/ci.yml/badge.svg)](https://github.com/martintondel02/meshdeck/actions/workflows/ci.yml)
 
-> An all-in-one Reticulum application — chat, file sharing, page hosting and network infrastructure, with a basic mode for everyone and an advanced mode for tinkerers.
+> A local-first Reticulum application: encrypted chat, file sharing, page hosting
+> and network infrastructure behind a browser UI — with a basic mode for people
+> who just want to talk, and an advanced mode for people who want the knobs.
 
-**Status:** early development (Phase 1). Working title "MeshDeck" — final name TBD.
+**Status: pre-release (`v0.1.0.dev0`).** Chat, contacts, attachments, page
+hosting and browsing, shared node files and the interface editor are implemented
+and covered by tests, and a PyInstaller build target exists. Phase 5 (release
+readiness) is still in progress, so there is no tagged release and no prebuilt
+binary to download, and no published AppImage or Flatpak. UI and copy may still
+change. The live task list is [NEXT_STEPS.md](NEXT_STEPS.md); the design record
+is [BUILD_PLAN.md](BUILD_PLAN.md).
 
-MeshDeck is a free and open-source application built on the
-[Reticulum Network Stack](https://reticulum.network/). It aims to be the
-friendly front door to Reticulum: one program where you can message people,
-send files, publish pages, and run your own piece of network infrastructure —
-without ever touching a config file, unless you *want* to.
+MeshDeck is free and open-source (MIT), built on the reference
+[Reticulum](https://reticulum.network/) stack. It uses the official `rns` and
+`lxmf` libraries rather than reimplementing the protocol: messaging speaks LXMF
+and page hosting follows NomadNet's node scheme, so it can interoperate with
+other clients instead of defining a new network.
 
-It fills a similar space to [MeshChatX](https://github.com/Quad4-Software/MeshChatX)
-(development ends January 2027), but is a fresh codebase with a different
-design focus: two first-class UI modes and guides/tooltips built into every
-screen. MeshDeck is fully interoperable with MeshChatX and other LXMF-based
-apps on the messaging layer.
+One local daemon owns your identity, database and Reticulum instance. The UI is
+a static web app served by that daemon to your browser on loopback. MeshDeck has
+no servers of its own, no accounts and no analytics; apart from the Reticulum
+traffic you configure, nothing leaves your machine.
 
-## Design pillars
+## What you get
 
-1. **Two modes, one app.**
-   - **Basic mode** — sane defaults, zero jargon on screen, wizards and
-     tooltips for everything. Connects locally via AutoInterface, with
-     optional one-click public entrypoints. No config text visible anywhere.
-   - **Advanced mode** — unlocks the interface editor, raw Reticulum config,
-     transport-node / public-entrypoint hosting, path diagnostics, micron
-     page editing, and network maps. Advanced mode *adds*; it never changes
-     how basic features behave.
-2. **Docs in the app, not next to it.** Every screen carries contextual help:
-   tooltips ("What is an announce?"), guided first-run flows, and short
-   guides shipped with the app and readable offline.
-3. **Stand on the official stack.** We use the reference `rns` and `lxmf`
-   Python packages as dependencies. We do not reimplement the protocol;
-   we build the application on top of it — like NomadNet, Sideband and
-   MeshChatX do.
-4. **Own your infrastructure.** Hosting a page, a propagation node or a
-   public entrypoint is a first-class, guided feature — not a hidden expert
-   trick. Small personal nodes are what make Reticulum resilient.
+| Area | Basic mode | Advanced mode adds |
+|---|---|---|
+| Chat | 1:1 LXMF messages, delivery ticks, in-conversation search, attachments up to 1.5 MiB per message, automatic stamps when a peer requires them | Direct / opportunistic / propagated delivery and a propagation-node address |
+| Contacts | Auto-discovery from announces, add by address, rename, block | — (same) |
+| Pages & node | Create, edit, preview and host micron pages; browse other nodes by address, with a cached copy when a node is unreachable; share files up to 32 MiB | — (same; the Pages tab is available in both modes) |
+| Interfaces | AutoInterface on by default | Editor for Auto, TCP client/server and Backbone client/server interfaces, listen address and port, gateway mode, automatic announce-rate presets for public listeners |
+| Infrastructure | — | Transport-node toggle |
+| Network status | Connected state, interface count, "announce now" | Live interface table (type, online, bitrate), config pre-flight before a restart, glossary |
+| Help | Built-in Guides tab and inline tooltips | Same, plus a technical glossary |
 
-## Architecture (overview)
+Advanced mode is a display filter, not a security boundary. File-size caps and
+page validation are enforced by the backend in both modes. The 512 KiB renderer
+cap protects the browser from oversized pages.
 
-```
-Frontend (Vite + Svelte web UI, runs in any browser)
-    └── WebSocket/REST ──► local Python daemon (127.0.0.1 only)
-                               ├── Identity & contacts
-                               ├── LXMF router (chat, store-and-forward)
-                               ├── File transfer service
-                               ├── Page/site hosting (micron nodes)
-                               └── Interface & transport-node manager
-                                        │
-                                     RNS core
-              (AutoInterface · TCP/Backbone · RNode/LoRa · I2P · …)
-```
+## Screenshots
 
-**The full build plan — architecture, API spec, storage schema, phases, and
-testing strategy — is in [BUILD_PLAN.md](BUILD_PLAN.md).** It is the single
-source of truth for development.
+Real captures from two throwaway daemons (no mocked-up UI):
 
-## Development quickstart
+| | |
+|---|---|
+| ![Chats with messages and an attachment](docs/screenshots/01-chats.png) | ![Page editor with live micron preview](docs/screenshots/02-pages-editor.png) |
+| ![Browsing another node's page](docs/screenshots/03-browse-node.png) | ![Advanced settings and propagation hosting](docs/screenshots/04-settings-advanced.png) |
+
+The capture recipe and privacy rules live in
+[docs/screenshots/README.md](docs/screenshots/README.md).
+
+## Quick start
+
+Prerequisites: Python 3.11 or newer, Node 22 with pnpm 10 (what CI uses), and
+GNU make. `make install` creates `.venv/` and installs the backend with its dev
+dependencies; it does not need a system `pip`.
 
 ```bash
-make install            # venv + backend with dev deps  (or: python3 -m venv .venv && .venv/bin/pip install -e ".[dev]")
-make install-frontend   # frontend deps (pnpm)
-make dev                # build UI + start daemon  → prints the UI URL (with token)
-
-make test               # unit tests
-make test-integration   # real-node tests: chat, files, restarts
-make lint               # ruff + svelte-check
-make package            # one-file binary with embedded UI (dist/meshdeck)
+git clone https://github.com/martintondel02/meshdeck.git
+cd meshdeck
+make install            # .venv + backend with dev deps
+make install-frontend   # pnpm install (once per checkout)
+make dev                # build the UI, start the daemon, print the URL
 ```
 
-Want just the runnable thing? `make package`, then run `./dist/meshdeck` —
-no Python install needed.
+On a checkout that already has the frontend dependencies installed,
+`make install && make dev` is enough.
 
-`python -m meshdeck --data-dir /tmp/x --port 8570` runs an isolated instance —
-handy for local two-instance chats. Current status: **Phase 3 done**
-(chat, files, contacts, interfaces + hosting wizards, stamps, packaging);
-see [BUILD_PLAN.md §12/§15](BUILD_PLAN.md). The authoritative task list for what's next (Phase 4 remainder + release readiness) is [NEXT_STEPS.md](NEXT_STEPS.md).
+`make dev` prints a URL like `http://127.0.0.1:8570/?token=…`. Open it: the
+token is what authenticates the UI to the local API, and the same value is
+stored in `<data-dir>/token`. On first run MeshDeck creates a Reticulum
+identity in its data directory — there is no signup. The default data directory
+is `${XDG_DATA_HOME:-~/.local/share}/meshdeck`; `--data-dir` overrides it.
+
+To try two identities at once, start a second isolated instance:
+
+```bash
+.venv/bin/python -m meshdeck --data-dir /tmp/meshdeck-b --port 8571
+```
+
+Each instance gets its own identity, database and Reticulum config. Use the
+address from one instance's Settings screen in the other's "add peer" field.
+
+### Or run the packaged binary
+
+```bash
+make package            # PyInstaller one-file build → dist/meshdeck
+./dist/meshdeck
+```
+
+The web UI is embedded in the binary, so the result needs no Python install.
+There are no prebuilt release downloads yet. AppImage and Flatpak manifests are
+experimental and are not part of a release. `make package` installs PyInstaller
+into the venv and requires the frontend dependencies.
+
+## How it works
+
+```
+Browser UI (Svelte 5, static assets)
+      │  HTTP + WebSocket on 127.0.0.1, bearer token
+      ▼
+aiohttp API ──► CoreService ──┬── SQLite (data dir)
+                              ├── ChatRouter (LXMF)
+                              ├── PageHost (/page, /file)
+                              └── RnsStack (RNS + interfaces)
+                                        │
+                                  Reticulum network
+```
+
+RNS and LXMF keep their own worker threads. Every callback that crosses from
+those threads into the app goes through the `EventBus` bridge, and Reticulum
+configuration changes are applied by re-executing the process under the CLI
+supervisor. The full picture — threading rules, startup order, the EventBus,
+database migrations and where to add a feature — is in
+[docs/architecture.md](docs/architecture.md), with the original design in
+[BUILD_PLAN.md §5](BUILD_PLAN.md#5-architecture).
+
+## Security and privacy
+
+- The daemon binds `127.0.0.1` by default. Every `/api/v1` request and the
+  `/ws` WebSocket require a bearer token generated on first run and stored with
+  mode `0600`. The UI keeps the token in `sessionStorage` and scrubs it from the
+  address bar. Treat the token like a password: anyone who has it can control
+  the node.
+- There is no telemetry, no analytics and no phone-home. Guides ship with the
+  app and work offline.
+- Messages are encrypted end-to-end by RNS/LXMF. Your history, identity key and
+  settings live in the local data directory; they are not uploaded anywhere.
+  That directory is not encrypted by MeshDeck, so use full-disk encryption if
+  that matters to you.
+- Pages are untrusted content from other nodes. The micron renderer escapes page
+  text, strips unknown markup and refuses pages over 512 KiB. Executable pages
+  are deliberately never run.
+- `--host` can bind the UI elsewhere, but there is no TLS and the token is the
+  only access control. Do not expose the daemon on an untrusted network.
+
+To report a vulnerability, follow [SECURITY.md](SECURITY.md). Please do not open
+a public issue for it.
+
+## What MeshDeck is not
+
+- **Not a cloud service or an account system.** No signup, no sync between
+  devices, no server-side history. Delete the data directory and the identity is
+  gone.
+- **Not a new protocol.** It does not reimplement RNS or LXMF, and it is not a
+  fork of NomadNet. It is an application on top of the official stack.
+- **Not an anonymity tool.** Reticulum encrypts and authenticates traffic; it
+  does not hide that a node exists or when it announces.
+- **Not a native desktop or mobile app yet.** It is a browser UI plus a local
+  daemon. No AppImage, Flatpak, release binary or Android build is published.
+- **Not a companion to your system `rnsd`.** MeshDeck runs its own Reticulum
+  instance with `share_instance = No` and never touches `~/.reticulum`.
+- **Not a full NomadNet clone.** Pages are static micron; there are no
+  executable pages and no inline image/media rendering. Share images as node
+  files or chat attachments.
+
+## Development
+
+```bash
+make test              # backend unit tests (fast, no network)
+make test-frontend     # vitest (micron renderer)
+make test-integration  # real RNS nodes; takes minutes
+make lint              # ruff + svelte-check
+make check             # unit + frontend tests + lint
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, test details, commit style and
+where copy and guides live. Architecture is in
+[docs/architecture.md](docs/architecture.md); known traps are listed in
+[BUILD_PLAN.md §14](BUILD_PLAN.md#14-pitfalls-learned-from-ecosystem-code--manual-reread-before-phases).
 
 ## License
 
 MeshDeck's own code is MIT — see [LICENSE](LICENSE). Reticulum and LXMF are
-distributed under their own licenses (Copyright (c) Mark Qvist and others,
-see the upstream projects); using them as libraries imposes no copyleft on
-MeshDeck, but redistribution of the stack itself must follow the
-[Reticulum license](https://github.com/markqvist/Reticulum/blob/master/LICENSE).
+Copyright (c) Mark Qvist and others and are distributed under their own
+licenses. Using them as libraries does not change MeshDeck's license, but
+redistributing them — for example inside the packaged binary — must follow their
+terms.
 
 ## Acknowledgements
 
-- [Mark Qvist](https://github.com/markqvist) — Reticulum, LXMF, NomadNet.
+- [Mark Qvist](https://github.com/markqvist) — Reticulum, LXMF and NomadNet.
 - [Liam Cottle](https://github.com/liamcottle) — original MeshChat.
-- [Quad4 Software](https://github.com/Quad4-Software) — MeshChatX, which
-  demonstrated what a modern Reticulum client can be, and whose source is a
-  reference for protocol-integration patterns.
+- [Quad4 Software](https://github.com/Quad4-Software) — MeshChatX, a reference
+  for modern Reticulum client design and protocol integration.
