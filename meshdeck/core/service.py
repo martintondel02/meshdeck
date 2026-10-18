@@ -125,6 +125,7 @@ class CoreService:
             display_name=self.settings.get("display_name") or "",
             delivery_method=self.settings.get("delivery_method") or "direct",
             propagation_node_hash=self.settings.get("propagation_node_hash") or "",
+            host_propagation_node=bool(self.settings.get("host_propagation_node")),
         )
         # NOTE: like RNS.Reticulum, LXMF.LXMRouter installs signal handlers in
         # its constructor — must run on the main thread. Construction is fast.
@@ -263,6 +264,10 @@ class CoreService:
             "interfaces": self.stack.interfaces() if self.stack else [],
             "peers": len(peer_repo.list_peers(self.db)),
             "uptime_seconds": round(time.time() - self._started_ts, 1),
+            "propagation_hosting": bool(self.chat and self.chat.propagation_hosting),
+            "propagation_node_hash": (
+                self.chat.propagation_node_hash_hex if self.chat else ""
+            ),
         }
 
     def identity_info(self) -> dict[str, Any]:
@@ -296,6 +301,24 @@ class CoreService:
     ) -> list[dict[str, Any]]:
         return msg_repo.list_messages(self.db, peer_hash, before=before, limit=limit)
 
+    def _ensure_peer_row(self, peer_hash: str) -> None:
+        """Guarantee the peers row exists before inserting a message.
+
+        messages.peer_hash has a foreign key, and a send can win the race with
+        the peer's announce (or target a manually added address), which made
+        the API return 500 FOREIGN KEY constraint failed *after* LXMF had
+        already sent the message."""
+        if peer_repo.get_peer(self.db, peer_hash) is not None:
+            return
+        identity_hash = peer_hash
+        try:
+            identity = RNS.Identity.recall(bytes.fromhex(peer_hash))
+            if identity is not None:
+                identity_hash = identity.hash.hex()
+        except Exception:  # noqa: BLE001 - never block sending on this lookup
+            log.debug("identity recall failed for %s", peer_hash, exc_info=True)
+        peer_repo.ensure_peer(self.db, peer_hash, identity_hash)
+
     def _record_outbound(
         self,
         msg_hash: str,
@@ -304,6 +327,7 @@ class CoreService:
         content: str,
         attachments_meta: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        self._ensure_peer_row(peer_hash)
         msg_repo.insert_message(
             self.db,
             {
@@ -444,6 +468,19 @@ class CoreService:
                 propagation_node_hash=self.settings.get("propagation_node_hash"),
             )
             self.bus.publish("settings_updated", applied)
+        if "host_propagation_node" in updates and self.chat is not None:
+            wanted = bool(self.settings.get("host_propagation_node"))
+            if wanted != self.chat.propagation_hosting:
+                # Live-apply: LXMRouter.enable/disable_propagation work on a
+                # running router and announce the new state immediately.
+                applied = self.chat.set_propagation_hosting(wanted)
+                self.bus.publish(
+                    "settings_updated",
+                    {
+                        "host_propagation_node": applied,
+                        "propagation_node_hash": self.chat.propagation_node_hash_hex,
+                    },
+                )
         result = self.settings.all()
         result["restart_required"] = restart_required
         return result

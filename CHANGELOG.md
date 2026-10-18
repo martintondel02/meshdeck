@@ -38,6 +38,13 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 - Integration test: 8 MiB download over a real two-node RNS link with
   monotonic progress and correct SHA-256.
 
+### Fixed (pre-release)
+
+- Sending to a peer whose announce had not yet been stored (a real race seen
+  while setting up two fresh nodes) no longer returns `500 FOREIGN KEY
+  constraint failed` after LXMF has already sent the message: the outbound
+  path now creates the peer row first (`_ensure_peer_row`, regression test).
+
 ### Fixed (Phase 4 — micron reader)
 
 - **Browsing pages from the UI actually works now.** The REST browse route

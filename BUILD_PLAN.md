@@ -663,6 +663,11 @@ phase; Playwright optional from Phase 5.
     renderer escaped links along with their labels, so `<a>` reached the DOM
     as text and no reader link worked. Escape text at the point of insertion
     and build tags afterwards; unit-test the DOM shape, not just safety.
+23. **`messages.peer_hash` is a foreign key to `peers`.** A send can win the
+    race with the peer's first announce (or target a manually added hash), so
+    `_record_outbound` must `ensure_peer` *before* inserting. Otherwise LXMF
+    sends the message successfully and the API then returns 500
+    `FOREIGN KEY constraint failed`, leaving the UI to think it failed.
 
 ---
 
