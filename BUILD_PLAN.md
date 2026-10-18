@@ -729,10 +729,20 @@ from NomadNet's Node.py is mandatory (a `*args` variant dies in the Link job
 thread with "Invalid signature for response generator callback" and the
 client just sees link established then no response).
 
-**Phase 4 remaining:** `/file` + `/media` handlers (file hosting via node),
-page caching, executable pages considered (deferred on purpose), resource
-progress UI for large responses, `lxm.FIELD` file hosting via chat still
-stands.
+**Phase 4 part 2 done (2026-10-18):** node file sharing — `/file/<name>`
+request handlers per shared file with `auto_compress=32 MiB` (NomadNet's
+scheme), shared store with traversal-safe names, client `fetch_file` over a
+Link, REST `/shared` CRUD + `/browse/{hash}/file/{name}`, UI share/download
+section. Integration test downloads 256 KiB with SHA-256 equality.
+
+Route-order pitfall (§14.20): aiohttp matches in REGISTRATION order, so
+`/browse/{hash}/file/{name}` must be registered BEFORE the
+`/browse/{hash}/{path:.+}` catch-all, or file downloads silently hit the
+page handler.
+
+**Phase 4 remaining:** `/media` handler (image conversion needs Pillow;
+deferred), page caching, executable pages (deliberately not supported),
+transfer-progress UI for very large responses.
 
 **Phase 5 (after):** i18n scaffolding, packaged releases (Flatpak/AppImage/
 Windows exe from the PyInstaller base), accessibility pass, first public tag.

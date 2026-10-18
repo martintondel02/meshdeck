@@ -16,16 +16,20 @@ NODE_ASPECT_PARTS = ("nomadnetwork", "node")
 DEFAULT_TIMEOUT = 25.0
 ESTABLISH_TIMEOUT = 15.0
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
+MAX_FILE_BYTES = 32 * 1024 * 1024
 
 
 class PageFetchError(Exception):
     """Machine-readable failure codes are in str(exc)."""
 
 
-def fetch_page(
-    node_hash_hex: str, path: str = "/page/index.mu", timeout: float = DEFAULT_TIMEOUT
+def fetch_path(
+    node_hash_hex: str,
+    path: str,
+    timeout: float = DEFAULT_TIMEOUT,
+    max_response_bytes: int = MAX_RESPONSE_BYTES,
 ) -> bytes:
-    """Blocking fetch of a page from a nomadnetwork.node destination.
+    """Blocking fetch of any node request path over an RNS Link.
 
     Raises PageFetchError with codes: invalid_node_hash, no_path, link_timeout,
     request_failed, response_too_large.
@@ -58,7 +62,7 @@ def fetch_page(
             path,
             data={},
             timeout=timeout,
-            max_response_size=MAX_RESPONSE_BYTES,
+            max_response_size=max_response_bytes,
         )
         if receipt is False:
             raise PageFetchError("request_failed")
@@ -79,3 +83,24 @@ def fetch_page(
             link.teardown()
         except Exception:  # noqa: BLE001
             pass
+
+
+def fetch_page(
+    node_hash_hex: str, path: str = "/page/index.mu", timeout: float = DEFAULT_TIMEOUT
+) -> bytes:
+    """Blocking fetch of a page from a nomadnetwork.node destination."""
+    return fetch_path(node_hash_hex, path, timeout=timeout)
+
+
+def fetch_file(
+    node_hash_hex: str,
+    name: str,
+    timeout: float = DEFAULT_TIMEOUT,
+) -> bytes:
+    """Blocking download of a shared file (/file/<name>) from a node."""
+    return fetch_path(
+        node_hash_hex,
+        f"/file/{name}",
+        timeout=timeout,
+        max_response_bytes=MAX_FILE_BYTES,
+    )

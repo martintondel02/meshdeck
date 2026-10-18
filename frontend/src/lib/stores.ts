@@ -84,6 +84,12 @@ export interface PageMeta {
   updated: number;
 }
 
+export interface SharedFile {
+  name: string;
+  size: number;
+  updated: number;
+}
+
 export interface NodeMeta {
   hash: string;
   name: string | null;

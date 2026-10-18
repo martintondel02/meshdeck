@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api } from "../lib/api";
+  import { api, downloadBlob, uploadFile } from "../lib/api";
   import Tooltip from "./Tooltip.svelte";
   import {
+    humanSize,
     nodeInfo,
     nodes,
     pages,
@@ -10,6 +11,7 @@
     type NodeInfo,
     type NodeMeta,
     type PageMeta,
+    type SharedFile,
   } from "../lib/stores";
   import { renderMicron } from "../lib/micron";
   import { TOOLTIPS } from "../lib/copy/tooltips";
@@ -34,7 +36,10 @@
   let browseErr = $state("");
   let pageResult = $state<BrowseResult | null>(null);
 
-  onMount(loadAll);
+  onMount(() => {
+    loadAll();
+    loadShared();
+  });
 
   async function loadAll() {
     try {
@@ -153,6 +158,64 @@
       default:
         return code || "fetch failed";
     }
+  }
+
+  // shared files state
+  let shared = $state<SharedFile[]>([]);
+  let sharedMsg = $state("");
+  let dlNode = $state("");
+  let dlName = $state("");
+
+  async function loadShared() {
+    try {
+      shared = await api<SharedFile[]>("/api/v1/shared");
+    } catch {
+      /* offline */
+    }
+  }
+
+  async function uploadShared(file: File) {
+    sharedMsg = "";
+    if (file.size > 32 * 1024 * 1024) {
+      sharedMsg = "file is larger than 32 MiB";
+      return;
+    }
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      await uploadFile("/api/v1/shared", form);
+      sharedMsg = "shared ✓ — anyone with your node address can download it";
+      await loadShared();
+    } catch (e) {
+      sharedMsg = e instanceof Error ? e.message : "upload failed";
+    }
+  }
+
+  async function unshare(name: string) {
+    if (!confirm(`Stop sharing ${name}?`)) return;
+    await api(`/api/v1/shared/${encodeURIComponent(name)}`, { method: "DELETE" });
+    await loadShared();
+  }
+
+  async function downloadFromNode() {
+    sharedMsg = "";
+    if (!dlNode.trim() || !dlName.trim()) return;
+    try {
+      await downloadBlob(
+        `/api/v1/browse/${encodeURIComponent(dlNode.trim())}/file/${encodeURIComponent(dlName.trim())}`,
+        dlName.trim(),
+      );
+      sharedMsg = "download started";
+    } catch (e) {
+      sharedMsg = browseErrorText(e);
+    }
+  }
+
+  function copyText(text: string) {
+    navigator.clipboard?.writeText(text).then(
+      () => (sharedMsg = "copied to clipboard"),
+      () => (sharedMsg = "could not copy"),
+    );
   }
 
   const rendered = $derived(renderMicron(editor));
@@ -348,6 +411,91 @@
           {@html renderMicron(pageResult.content)}
         </div>
       </div>
+    {/if}
+  </section>
+
+  <!-- shared files -->
+  <section class="bg-wp-panel border border-wp-border rounded-xl p-4 space-y-3">
+    <h2 class="text-sm font-semibold text-wp-dim uppercase tracking-wide">
+      Shared files
+      <Tooltip text={TOOLTIPS.shared_files} />
+    </h2>
+    <p class="text-xs text-wp-dim">
+      Host files on your node (up to 32 MiB each) — anyone who knows your node
+      address can download them, no chat message needed.
+    </p>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <label
+        class="bg-wp-bg border border-wp-border rounded-lg px-3 py-1.5 text-sm cursor-pointer hover:border-wp-accent"
+      >
+        ＋ Share a file
+        <input
+          type="file"
+          class="hidden"
+          onchange={(e) => {
+            const f = e.currentTarget.files?.[0];
+            if (f) uploadShared(f);
+            e.currentTarget.value = "";
+          }}
+        />
+      </label>
+      {#if $nodeInfo}
+        <button
+          class="text-xs text-wp-dim hover:text-wp-accent"
+          onclick={() =>
+            copyText(`${$nodeInfo.node_hash} — /file/<name>`)}
+          >copy node address</button
+        >
+      {/if}
+    </div>
+
+    {#if shared.length === 0}
+      <p class="text-xs text-wp-dim">Nothing shared yet.</p>
+    {:else}
+      <ul class="space-y-1">
+        {#each shared as f (f.name)}
+          <li class="flex items-center gap-3 text-sm">
+            <span class="flex-1 text-wp-text">{f.name}</span>
+            <span class="text-xs text-wp-dim">{humanSize(f.size)}</span>
+            <button
+              class="text-xs text-wp-dim hover:text-wp-accent"
+              onclick={() => downloadBlob(`/api/v1/shared/${encodeURIComponent(f.name)}`, f.name)}
+              >download</button
+            >
+            <button
+              class="text-wp-dim hover:text-wp-danger text-xs"
+              title="stop sharing"
+              onclick={() => unshare(f.name)}>✕</button
+            >
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
+    <div class="border-t border-wp-border pt-3 space-y-2">
+      <p class="text-xs text-wp-dim">Download from another node:</p>
+      <div class="flex flex-wrap gap-2 items-center">
+        <input
+          bind:value={dlNode}
+          placeholder="node address (hash)"
+          class="flex-1 min-w-56 bg-wp-bg border border-wp-border rounded-lg px-2 py-1 text-sm font-mono"
+        />
+        <input
+          bind:value={dlName}
+          placeholder="filename.bin"
+          class="w-48 bg-wp-bg border border-wp-border rounded-lg px-2 py-1 text-sm font-mono"
+        />
+        <button
+          onclick={downloadFromNode}
+          disabled={!dlNode.trim() || !dlName.trim()}
+          class="bg-wp-accent text-wp-bg text-sm font-semibold px-4 py-1.5 rounded-lg"
+          >Get file</button
+        >
+      </div>
+    </div>
+    {#if sharedMsg}
+      <p class="text-xs text-wp-dim">{sharedMsg}</p>
     {/if}
   </section>
 </div>

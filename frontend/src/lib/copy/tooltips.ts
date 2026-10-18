@@ -51,6 +51,8 @@ export const TOOLTIPS = {
     "Announcing tells the network your node exists and publishes its name. Pages are served even without announcing, but then only people who already know your address can find you.",
   node_browse:
     "Paste the address of any node that hosts pages (NomadNet node, Sideband, or another MeshDeck instance) — Open fetches its home page over an encrypted, resumable link.",
+  shared_files:
+    "Files hosted on your node and fetched on demand over an RNS link (NomadNet's /file scheme). Unlike chat attachments they don't ride inside messages — anyone with your node address can download them while your node is online.",
 } as const;
 
 export const GLOSSARY = {

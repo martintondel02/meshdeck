@@ -16,6 +16,7 @@ from typing import Any
 import RNS
 
 from meshdeck.core.events import EventBus
+from meshdeck.pages.files import MAX_SHARED_BYTES, SharedFileError, SharedFiles
 from meshdeck.pages.storage import PageNameError, PageStore
 from meshdeck.rns.identity import IdentityManager
 
@@ -23,6 +24,7 @@ log = logging.getLogger(__name__)
 
 NODE_ASPECT = "nomadnetwork.node"  # announce aspect filter (dotted)
 REQUEST_PREFIX = "/page/"
+FILE_PREFIX = "/file/"
 
 default_index = """>{} — MeshDeck Node
 
@@ -73,8 +75,11 @@ class PageHost:
         pages_dir: Path,
         identity_manager: IdentityManager,
         bus: EventBus,
+        shared_dir: Path | None = None,
     ) -> None:
         self.store = PageStore(pages_dir)
+        default_shared = pages_dir.parent / "shared"
+        self.files = SharedFiles(shared_dir if shared_dir is not None else default_shared)
         self._identity_manager = identity_manager
         self._bus = bus
         self._destination: RNS.Destination | None = None
@@ -94,6 +99,7 @@ class PageHost:
         )
         self.node_name = node_name or "MeshDeck Node"
         self.register_all_pages()
+        self.register_all_files()
         log.info(
             "Page hosting destination ready at %s",
             self.node_destination_hash_hex,
@@ -112,7 +118,7 @@ class PageHost:
     def set_node_name(self, name: str) -> None:
         self.node_name = name.strip() or "MeshDeck Node"
 
-    # -- page serving ----------------------------------------------------------
+    # -- page + file serving ---------------------------------------------------
 
     def register_all_pages(self) -> None:
         """Scan the pages dir and register a handler per page (plus a default
@@ -123,6 +129,38 @@ class PageHost:
             self._register("/page/index.mu", default=default_index.format(self.node_name))
         for name in names:
             self._register(f"/page/{name}")
+
+    def register_all_files(self) -> None:
+        """Register a /file/<name> handler per shared file."""
+        for info in self.files.list_files():
+            self._register_file(f"/file/{info['name']}")
+
+    def _register_file(self, request_path: str) -> None:
+        assert self._destination is not None
+        name = request_path[len(FILE_PREFIX):]
+
+        def generator(
+            path: str,
+            data: dict | None,
+            request_id: Any,
+            link_id: Any,
+            remote_identity: Any,
+            requested_at: Any,
+        ) -> bytes | None:
+            try:
+                content = self.files.read(name)
+            except SharedFileError:
+                content = None
+            if content is None:
+                return b""
+            return content
+
+        self._destination.register_request_handler(
+            request_path,
+            response_generator=generator,
+            allow=RNS.Destination.ALLOW_ALL,
+            auto_compress=MAX_SHARED_BYTES,
+        )
 
     def _register(self, request_path: str, default: str | None = None) -> None:
         assert self._destination is not None

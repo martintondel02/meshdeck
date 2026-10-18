@@ -22,6 +22,7 @@ from meshdeck.api.schemas import (
 from meshdeck.chat.router import MAX_ATTACHMENT_TOTAL_BYTES
 from meshdeck.core.events import Event
 from meshdeck.core.service import CoreService
+from meshdeck.pages.files import MAX_SHARED_BYTES
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +45,17 @@ def _json(data: Any, status: int = 200) -> web.Response:
 
 def _error(status: int, code: str, message: str) -> web.Response:
     return _json({"ok": False, "error": {"code": code, "message": message}}, status=status)
+
+
+def _binary_response(data: bytes, name: str) -> web.Response:
+    safe = name.replace('"', "").replace("\\", "_")
+    return web.Response(
+        body=data,
+        headers={
+            "Content-Type": "application/octet-stream",
+            "Content-Disposition": f'attachment; filename="{safe}"',
+        },
+    )
 
 
 class ApiServer:
@@ -105,7 +117,16 @@ class ApiServer:
         app.router.add_get("/api/v1/node", self._node_info)
         app.router.add_post("/api/v1/node/publish", self._node_publish)
         app.router.add_get("/api/v1/nodes", self._nodes_discovered)
+        # NOTE: more specific browse route must precede the page catch-all
+        # (aiohttp matches in registration order).
+        app.router.add_get(
+            "/api/v1/browse/{hash}/file/{name:.+}", self._browse_file
+        )
         app.router.add_get("/api/v1/browse/{hash}/{path:.+}", self._browse_page)
+        app.router.add_get("/api/v1/shared", self._shared_list)
+        app.router.add_post("/api/v1/shared", self._shared_upload)
+        app.router.add_get("/api/v1/shared/{name:.+}", self._shared_download)
+        app.router.add_delete("/api/v1/shared/{name:.+}", self._shared_delete)
         app.router.add_get("/api/v1/settings", self._get_settings)
         app.router.add_put("/api/v1/settings", self._put_settings)
         app.router.add_post("/api/v1/announce", self._announce)
@@ -315,6 +336,46 @@ class ApiServer:
                 request.match_info["hash"], request.match_info["path"]
             )
         )
+
+    # -- shared files (node hosting) -----------------------------------------
+
+    async def _shared_list(self, request: web.Request) -> web.Response:
+        return _json(self.service.list_shared())
+
+    async def _shared_upload(self, request: web.Request) -> web.Response:
+        if not request.content_type.startswith("multipart/"):
+            raise BadRequest("invalid_body", "expected multipart/form-data")
+        filename = "shared.bin"
+        data = bytearray()
+        reader = await request.multipart()
+        async for part in reader:  # type: ignore[union-attr]
+            if part.name == "file":
+                if part.filename:
+                    filename = part.filename
+                while True:
+                    chunk = await part.read_chunk(64 * 1024)
+                    if not chunk:
+                        break
+                    data.extend(chunk)
+                    if len(data) > MAX_SHARED_BYTES:
+                        raise BadRequest("too_large", "file exceeds 32 MiB")
+        if not data:
+            raise BadRequest("missing_file", "multipart field 'file' is required")
+        return _json(self.service.share_file(filename, bytes(data)), status=201)
+
+    async def _shared_download(self, request: web.Request) -> web.Response:
+        data, name = self.service.read_shared(request.match_info["name"])
+        return _binary_response(data, name)
+
+    async def _shared_delete(self, request: web.Request) -> web.Response:
+        self.service.unshare_file(request.match_info["name"])
+        return _json({"deleted": request.match_info["name"]})
+
+    async def _browse_file(self, request: web.Request) -> web.Response:
+        data, name, _elapsed = await self.service.download_shared(
+            request.match_info["hash"], request.match_info["name"]
+        )
+        return _binary_response(data, name)
 
     # -- WebSocket -----------------------------------------------------------
 

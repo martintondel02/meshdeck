@@ -60,3 +60,31 @@ def test_default_index_served_when_missing(tmp_path: Path) -> None:
 
     assert ">{" in default_index  # formatted with the node name
     assert ".mu" in default_index or "micron" in default_index.lower()
+
+
+def test_shared_file_names_and_crud(tmp_path: Path) -> None:
+    from meshdeck.pages.files import (
+        MAX_SHARED_BYTES,
+        SharedFileError,
+        SharedFiles,
+        sanitize_shared_name,
+    )
+
+    assert sanitize_shared_name("report.pdf") == "report.pdf"
+    assert sanitize_shared_name("../../etc/passwd") == "passwd"
+    assert sanitize_shared_name("a b?/../c d.txt") == "c_d.txt"
+    for bad in ["", "..", "/"]:
+        with pytest.raises(SharedFileError):
+            sanitize_shared_name(bad)
+
+    store = SharedFiles(tmp_path / "shared")
+    store.save("notes.txt", b"hello mesh")
+    assert store.read("notes.txt") == b"hello mesh"
+    assert [f["name"] for f in store.list_files()] == ["notes.txt"]
+
+    with pytest.raises(SharedFileError):
+        store.save("big.bin", b"x" * (MAX_SHARED_BYTES + 1))
+
+    store.delete("notes.txt")
+    assert store.list_files() == []
+    assert store.read("notes.txt") is None

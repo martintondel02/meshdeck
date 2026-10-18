@@ -208,3 +208,74 @@ def _write_extra(dir_b: Path, port: int) -> Path:
     f = dir_b / "extra.conf"
     f.write_text(CLIENT_EXTRA.format(port=port), encoding="utf-8")
     return f
+
+
+def test_shared_file_download_over_link(tmp_path):
+    """A hosts a shared file; B downloads it over an RNS Link and the SHA-256
+    matches. Exercises the /file/<name> handlers end to end."""
+    import os
+
+    port_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    port_socket.bind(("127.0.0.1", 0))
+    port = port_socket.getsockname()[1]
+    port_socket.close()
+
+    dir_a = tmp_path / "node_a"
+    dir_b = tmp_path / "node_b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    (dir_a / "pages").mkdir()
+    (dir_a / "pages" / "index.mu").write_text(PAGE, encoding="utf-8")
+    (dir_a / "shared").mkdir()
+    payload = os.urandom(256 * 1024)
+    (dir_a / "shared" / "bundle.bin").write_bytes(payload)
+
+    proc_a = launch_node(
+        dir_a,
+        SERVER_EXTRA.format(port=port),
+        "FileHost",
+        serve_node="File Node",
+    )
+    try:
+        assert wait_for_file(dir_a / "ready.json", BOOT_TIMEOUT)
+        node_hash_a = _read_published_hash(proc_a)
+        assert node_hash_a
+
+        proc_b = launch_node(
+            dir_b,
+            CLIENT_EXTRA.format(port=port),
+            "FileReader",
+            fetch_file_from=node_hash_a,
+            file_name="bundle.bin",
+        )
+        try:
+            assert wait_for_file(dir_b / "done.json", TEST_TIMEOUT), (
+                "B never downloaded the shared file\n"
+                + "\n".join(f"[A] {ln}" for ln in _dump(proc_a.stdout))
+                + "\n"
+                + "\n".join(f"[B] {ln}" for ln in _dump(proc_b.stdout))
+            )
+            got = json.loads((dir_b / "done.json").read_text())["fetched_file"]
+            assert got["name"] == "bundle.bin"
+            assert got["size"] == len(payload)
+            assert got["sha256"] == hashlib.sha256(payload).hexdigest()
+        finally:
+            proc_b.terminate()
+            proc_b.wait(timeout=20)
+    finally:
+        proc_a.terminate()
+        proc_a.wait(timeout=20)
+
+
+def _read_published_hash(proc) -> str | None:
+    """Read node A's stdout until the node_published event appears."""
+    import select
+
+    deadline = time.time() + BOOT_TIMEOUT
+    while time.time() < deadline:
+        r, _, _ = select.select([proc.stdout], [], [], 0.25)
+        if r:
+            line = proc.stdout.readline()
+            if '"event": "node_published"' in line:
+                return json.loads(line)["hash"]
+    return None

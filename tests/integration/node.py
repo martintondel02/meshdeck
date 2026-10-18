@@ -104,6 +104,30 @@ async def run(args: argparse.Namespace) -> int:
 
         asyncio.create_task(fetcher())
 
+    if args.fetch_file_from and args.file_name:
+        async def file_fetcher() -> None:
+            import hashlib
+
+            for attempt in range(40):
+                try:
+                    data, name, elapsed = await service.download_shared(
+                        args.fetch_file_from, args.file_name
+                    )
+                    result["ok"] = True
+                    result["fetched_file"] = {
+                        "name": name,
+                        "size": len(data),
+                        "sha256": hashlib.sha256(data).hexdigest(),
+                        "elapsed_ms": elapsed,
+                    }
+                    done_condition.set()
+                    return
+                except ValueError as exc:
+                    jlog(event="file_fetch_retry", attempt=attempt, error=str(exc))
+                    await asyncio.sleep(3)
+
+        asyncio.create_task(file_fetcher())
+
     if args.restart_watch_file:
         watch_path = Path(args.restart_watch_file)
         boot_mtime = watch_path.stat().st_mtime if watch_path.exists() else 0.0
@@ -199,6 +223,10 @@ def main() -> int:
     parser.add_argument("--fetch-page-from", default=None,
                         help="fetch a page from this node destination hash")
     parser.add_argument("--page-path", default="/page/index.mu")
+    parser.add_argument("--fetch-file-from", default=None,
+                        help="download a shared file from this node destination hash")
+    parser.add_argument("--file-name", default=None,
+                        help="name of the shared file to download")
     parser.add_argument("--expect-node", default=None,
                         help="done when a nomadnetwork.node announce with this hash arrives")
     parser.add_argument("--ready-file", required=True)

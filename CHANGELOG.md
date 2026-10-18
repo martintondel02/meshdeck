@@ -4,6 +4,26 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added (Phase 4 — node file sharing)
+
+- File hosting on your node: `/file/<name>` handlers using NomadNet's scheme
+  (up to 32 MiB per file, auto-compressed, fetched on demand over an
+  encrypted link — no chat message needed). Shared-files section in the Pages
+  tab: upload, list, download, stop sharing, and download from any node by
+  address + filename.
+- REST: `GET/POST /api/v1/shared`, `GET/DELETE /api/v1/shared/{name}`,
+  `GET /api/v1/browse/{hash}/file/{name}`.
+- Tests: shared-name sanitization/traversal unit tests, API upload/download/
+  delete acceptance checks, and an integration test downloading a 256 KiB
+  file over a real two-node RNS link with SHA-256 equality.
+
+### Fixed (pre-release)
+
+- aiohttp matches routes in registration order: the specific
+  `/browse/{hash}/file/{name}` route is now registered before the
+  `/browse/{hash}/{path:.+}` catch-all, so file downloads aren't swallowed by
+  the page handler.
+
 ### Added (Phase 4)
 
 - **Page hosting (NomadNet-compatible)**: your node can serve micron `.mu`

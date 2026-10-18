@@ -70,3 +70,32 @@ export async function uploadFile<T = unknown>(
   }
   return (await res.json()) as T;
 }
+
+/** Authenticated binary download saved through the browser. */
+export async function downloadBlob(path: string, fallbackName: string): Promise<void> {
+  const res = await fetch(path, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) {
+    let code = `${res.status}`;
+    try {
+      const body = await res.json();
+      code = body?.error?.code ?? code;
+    } catch {
+      /* non-JSON */
+    }
+    throw new Error(code);
+  }
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = /filename="([^"]+)"/.exec(disposition);
+  const name = match?.[1] ?? fallbackName;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}

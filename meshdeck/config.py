@@ -86,6 +86,10 @@ class AppPaths:
         return self.data_dir / "pages"
 
     @property
+    def shared_dir(self) -> Path:
+        return self.data_dir / "shared"
+
+    @property
     def logs_dir(self) -> Path:
         return self.data_dir / "logs"
 

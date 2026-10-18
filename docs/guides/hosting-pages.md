@@ -44,3 +44,17 @@ MeshDeck implements the same node scheme as NomadNet (destination aspect
 `nomadnetwork.node`, request paths `/page/...`), so your pages are also
 browsable from NomadNet and any client speaking that protocol — and you can
 browse theirs the same way.
+
+## Sharing files from your node
+
+Besides pages, your node can host **files** (up to 32 MiB each) using the
+same NomadNet `/file/` scheme:
+
+1. Pages tab → *Shared files* → **＋ Share a file**.
+2. Anyone with your node address can download it — no chat message needed,
+   fetched on demand over an encrypted link.
+3. To grab a file from another node: paste their node address plus the
+   filename and press **Get file**.
+
+Chat attachments remain the better choice for sending something to one
+specific person; node files are for things you want to publish.

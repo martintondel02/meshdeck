@@ -161,6 +161,31 @@ async def test_api_endtoend(tmp_path):
                 f"{base}/api/v1/browse/zz/index.mu", headers=auth
             ) as r:
                 assert r.status == 400  # invalid node hash
+
+            # --- shared files: upload, list, download, delete
+            form = aiohttp.FormData()
+            form.add_field("file", b"shared payload 123", filename="notes.txt",
+                           content_type="application/octet-stream")
+            async with s.post(f"{base}/api/v1/shared", headers=auth, data=form) as r:
+                assert r.status == 201
+                assert (await r.json())["name"] == "notes.txt"
+            async with s.get(f"{base}/api/v1/shared", headers=auth) as r:
+                assert [f["name"] for f in await r.json()] == ["notes.txt"]
+            async with s.get(f"{base}/api/v1/shared/notes.txt", headers=auth) as r:
+                assert r.status == 200
+                assert await r.read() == b"shared payload 123"
+                assert "notes.txt" in r.headers["Content-Disposition"]
+            async with s.get(
+                f"{base}/api/v1/browse/zz/file/notes.txt", headers=auth
+            ) as r:
+                assert r.status == 400  # invalid node hash
+                assert r.status == 400  # invalid node hash
+            async with s.delete(
+                f"{base}/api/v1/shared/notes.txt", headers=auth
+            ) as r:
+                assert r.status == 200
+            async with s.get(f"{base}/api/v1/shared", headers=auth) as r:
+                assert await r.json() == []
     finally:
         await server.stop()
         await service.stop()

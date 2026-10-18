@@ -32,7 +32,8 @@ from meshdeck.config import (
     SettingsStore,
 )
 from meshdeck.core.events import Event, EventBus
-from meshdeck.pages.client import PageFetchError, fetch_page
+from meshdeck.pages.client import PageFetchError, fetch_file, fetch_page
+from meshdeck.pages.files import SharedFileError
 from meshdeck.pages.hosting import NodeAnnounceHandler, PageHost
 from meshdeck.pages.storage import PageNameError
 from meshdeck.rns.config_gen import render_config, validate_interfaces
@@ -131,7 +132,9 @@ class CoreService:
         RNS.Transport.register_announce_handler(self.announce_handler)
 
         # Page hosting: nomadnetwork.node destination + announce handler.
-        self.pages = PageHost(self.paths.pages_dir, self.identity, self.bus)
+        self.pages = PageHost(
+            self.paths.pages_dir, self.identity, self.bus, shared_dir=self.paths.shared_dir
+        )
         self.pages.start(node_name=self.settings.get("node_name") or "")
         self.node_announce_handler = NodeAnnounceHandler(
             self.bus, own_hash_hex=self.pages.node_destination_hash_hex
@@ -528,6 +531,49 @@ class CoreService:
 
     def list_nodes(self) -> list[dict[str, Any]]:
         return node_repo.list_nodes(self.db)
+
+    # -- shared files (node hosting) --------------------------------------------
+
+    def list_shared(self) -> list[dict[str, Any]]:
+        return self.pages.files.list_files()
+
+    def share_file(self, name: str, data: bytes) -> dict[str, Any]:
+        try:
+            result = self.pages.files.save(name, data)
+        except SharedFileError as exc:
+            raise ValueError(f"invalid_file:{exc}") from None
+        self.pages.register_all_files()
+        return result
+
+    def unshare_file(self, name: str) -> None:
+        try:
+            self.pages.files.delete(name)
+        except SharedFileError:
+            raise ValueError("invalid_file_name") from None
+
+    def read_shared(self, name: str) -> tuple[bytes, str]:
+        try:
+            data = self.pages.files.read(name)
+        except SharedFileError:
+            raise ValueError("invalid_file_name") from None
+        if data is None:
+            raise ValueError("not_found")
+        return data, name
+
+    async def download_shared(
+        self, node_hash: str, name: str
+    ) -> tuple[bytes, str, float]:
+        """Fetch a file hosted on another node; returns (bytes, name, elapsed)."""
+        started = time.time()
+        try:
+            data = await asyncio.wait_for(
+                asyncio.to_thread(fetch_file, node_hash, name), timeout=120
+            )
+        except PageFetchError as exc:
+            raise ValueError(str(exc)) from None
+        except TimeoutError:
+            raise ValueError("link_timeout") from None
+        return data, name, round((time.time() - started) * 1000, 1)
 
     async def browse_page(
         self, node_hash: str, path: str
