@@ -22,7 +22,7 @@ TEST_TIMEOUT = 180
 SERVER_EXTRA = """  [[Test Server]]
     type = TCPServerInterface
     enabled = yes
-    listen_on = 127.0.0.1
+    listen_ip = 127.0.0.1
     port = {port}
 """
 

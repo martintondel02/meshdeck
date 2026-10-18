@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-wp-bg: #0b0f14;
+  --color-wp-panel: #11181f;
+  --color-wp-panel2: #182430;
+  --color-wp-border: #24313d;
+  --color-wp-text: #dbe6ee;
+  --color-wp-dim: #8ca3b2;
+  --color-wp-accent: #35c48d;
+  --color-wp-accent2: #46a3ff;
+  --color-wp-warn: #f0b45a;
+  --color-wp-danger: #ef6461;
+}
+
+body {
+  background: var(--color-wp-bg);
+  color: var(--color-wp-text);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}

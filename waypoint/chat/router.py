@@ -113,6 +113,10 @@ class ChatRouter:
         )
         lxm.register_delivery_callback(self._on_outbound_delivered)
         lxm.register_failed_callback(self._on_outbound_failed)
+        # pack() is guarded by `if not self.packed` and computes the message
+        # hash deterministically; without this, lxm.hash is None until the
+        # router's outbound thread packs it, and we couldn't track the message.
+        lxm.pack()
         self._pending[lxm.hash.hex()] = lxm
         self._router.handle_outbound(lxm)
         return lxm.hash.hex()

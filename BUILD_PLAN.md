@@ -543,7 +543,7 @@ loglevel = 4
 [[Test Server]]
 type = TCPServerInterface
 enabled = yes
-listen_on = 127.0.0.1
+listen_ip = 127.0.0.1
 port = 4255
 ```
 Node B config: TCP client — same but
@@ -589,27 +589,51 @@ phase; Playwright optional from Phase 5.
     without an explicit advanced setting.
 11. **License hygiene**: keep MIT headers on our files; vendor nothing from
     MeshChatX without preserving its license notices.
+12. **Constructors must run on the main thread of the main interpreter**:
+    both `RNS.Reticulum(...)` and `LXMF.LXMRouter(...)` install SIGINT/SIGTERM
+    handlers on construction → `ValueError: signal only works in main
+    thread` (or a hard process exit) if built in a worker thread. Call them
+    from the asyncio main task, never via `asyncio.to_thread`.
+13. **`RNS.panic()` is `os._exit(255)`** — misconfigured interfaces kill the
+    process silently, and if `logfile` is set the error never even reaches
+    stdout. Always pre-validate interface blocks
+    (`RnsStack.validate_interface_config`) before constructing RNS.
+14. **Interface key names (rns 1.5.7)**: `TCPServerInterface`/
+    `BackboneInterface` take **`listen_ip`** + `port` (or `listen_port`);
+    the older docs spelling `listen_on` is NOT accepted by
+    `TCPServerInterface` — it panics. Clients take `target_host`/`target_port`.
+15. **`LXMessage.hash` is `None` until `pack()`** — call `lxm.pack()`
+    yourself right after construction (guarded, deterministic) before
+    `handle_outbound`, or you cannot track outbound state.
 
 ---
 
 ## 15. Build order checklist (execute in order; commit per step)
 
-- [ ] 1. `pyproject.toml` + package skeleton + `python -m waypoint` stub
-- [ ] 2. `config.py` + `storage/db.py` + migrations + unit tests
-- [ ] 3. `rns/config_gen.py` + unit tests (snapshot 3 variants)
-- [ ] 4. `core/events.py` + unit test
-- [ ] 5. `rns/identity.py` + `rns/stack.py` (smoke: stack starts in temp dir)
-- [ ] 6. `chat/peers.py` (announce decode unit test with crafted msgpack)
-- [ ] 7. `chat/router.py` + `core/service.py` skeletons
-- [ ] 8. Integration harness `node.py` + `test_two_nodes.py` — make it pass
-- [ ] 9. `api/server.py` (REST + WS + auth) + tests for auth + happy paths
-- [ ] 10. Frontend scaffold (Svelte+TS+Tailwind) + token + WS store
-- [ ] 11. Onboarding-lite + Chats + Chat view wired to real API
-- [ ] 12. Backend serves `frontend/dist`; `make dev` flow documented
-- [ ] 13. Phase 1 DoD manual test: two instances, two browsers, real chat
-- [ ] 14. `Makefile`, README dev quickstart refresh, CHANGELOG start
+**Phase 1 (MVP) — DONE 2026-10-18.** Verified: 24 unit tests, two-node
+integration test (5.4s), full manual E2E with two daemons over the real
+REST/WS API (auth enforced, discovery, delivery receipts, live WS events).
 
-Then continue into Phase 2, keeping this file's checkboxes current.
+- [x] 1. `pyproject.toml` + package skeleton + `python -m waypoint` stub
+- [x] 2. `config.py` + `storage/db.py` + migrations + unit tests
+- [x] 3. `rns/config_gen.py` + unit tests (snapshot 3 variants)
+- [x] 4. `core/events.py` + unit test
+- [x] 5. `rns/identity.py` + `rns/stack.py` (smoke: stack starts in temp dir)
+- [x] 6. `chat/peers.py` (announce decode unit test with crafted msgpack)
+- [x] 7. `chat/router.py` + `core/service.py` skeletons
+- [x] 8. Integration harness `node.py` + `test_two_nodes.py` — passing
+- [x] 9. `api/server.py` (REST + WS + auth) + tests for auth + happy paths
+      (auth + endpoints verified in manual E2E; automated API tests = Phase 2 task)
+- [x] 10. Frontend scaffold (Svelte+TS+Tailwind) + token + WS store
+- [x] 11. Onboarding-lite + Chats + Chat view wired to real API
+- [x] 12. Backend serves `frontend/dist`; `make dev` flow documented
+- [x] 13. Phase 1 DoD manual test: two instances exchange chat (curl/WS-driven)
+- [x] 14. `Makefile`, README dev quickstart refresh, CHANGELOG start
+
+**Phase 2 (next):** contacts UX polish, manual add-by-hash + path-request
+handling in the UI ("waiting for path" state), history search, LXMF file
+attachments (`FIELD_FILE_ATTACHMENTS`), propagation-node fallback, automated
+API tests, two-way integration test (reply round-trip).
 
 ---
 

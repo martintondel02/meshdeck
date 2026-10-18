@@ -38,7 +38,6 @@ async def run(args: argparse.Namespace) -> int:
     result: dict = {"ok": False}
 
     peer_found = asyncio.Event()
-    delivered = asyncio.Event()
     sent_hash: dict[str, str] = {}
 
     async def on_event(event) -> None:
@@ -143,8 +142,8 @@ def main() -> int:
         paths = AppPaths(data_dir=Path(args.data_dir))
         paths.ensure()
         if args.extra_config_file or args.no_autointerface or args.display_name:
-            from waypoint.storage.db import Database
             from waypoint.config import SettingsStore
+            from waypoint.storage.db import Database
 
             db = Database(paths.db_path)
             db.open()

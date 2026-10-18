@@ -72,7 +72,12 @@ class CoreService:
 
         self.stack = RnsStack(self.paths.reticulum_dir, self.settings.all)
         log_file = str(self.paths.logs_dir / "reticulum.log")
-        await asyncio.to_thread(self.stack.start, log_file)
+        # NOTE: RNS.Reticulum installs SIGINT/SIGTERM handlers on construction,
+        # which Python only allows on the main thread of the main interpreter.
+        # The loop runs on the main thread, so start the stack directly here
+        # (never via asyncio.to_thread). Interface bring-up can take a couple
+        # of seconds with AutoInterface; acceptable during startup.
+        self.stack.start(log_file)
 
         self.chat = ChatRouter(
             self.paths.lxmf_dir,
@@ -80,7 +85,9 @@ class CoreService:
             self.bus,
             display_name=self.settings.get("display_name") or "",
         )
-        await asyncio.to_thread(self.chat.start)
+        # NOTE: like RNS.Reticulum, LXMF.LXMRouter installs signal handlers in
+        # its constructor — must run on the main thread. Construction is fast.
+        self.chat.start()
 
         self.announce_handler = LxmfPeerAnnounceHandler(
             self.bus, own_destination_hash_hex=self.chat.delivery_destination_hash_hex

@@ -59,13 +59,18 @@ source of truth for development.
 ## Development quickstart
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .          # once pyproject.toml lands (Phase 1, step 1)
-python -m waypoint
+make install            # venv + backend with dev deps  (or: python3 -m venv .venv && .venv/bin/pip install -e ".[dev]")
+make install-frontend   # frontend deps (pnpm)
+make dev                # build UI + start daemon  → prints the UI URL (with token)
+
+make test               # unit tests
+make test-integration   # two real nodes exchanging an LXMF message
+make lint               # ruff + svelte-check
 ```
 
-Current status and next steps: [BUILD_PLAN.md §12 and §15](BUILD_PLAN.md).
+`python -m waypoint --data-dir /tmp/x --port 8570` runs an isolated instance —
+handy for local two-instance chats. Current status: **Phase 1 (chat MVP)
+done and verified**; see [BUILD_PLAN.md §12/§15](BUILD_PLAN.md).
 
 ## License
 

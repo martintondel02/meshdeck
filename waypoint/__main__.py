@@ -18,6 +18,7 @@ from waypoint.config import (
     load_or_create_token,
 )
 from waypoint.core.service import CoreService
+from waypoint.rns.stack import InvalidConfigError
 
 log = logging.getLogger("waypoint")
 
@@ -54,7 +55,12 @@ async def amain(args: argparse.Namespace) -> int:
     token = load_or_create_token(paths.token_path)
 
     service = CoreService(paths)
-    await service.start()
+    try:
+        await service.start()
+    except InvalidConfigError as exc:
+        print(f"Reticulum configuration error: {exc}")
+        print(f"(edit via settings, or fix/remove {paths.reticulum_config_path})")
+        return 2
 
     server = ApiServer(service, token, static_dir=resolve_static_dir())
     port = await server.start(args.host, args.port)
