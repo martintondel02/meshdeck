@@ -829,6 +829,14 @@ unknown backtick tokens, and a 512 KiB render cap.
 **Phase 5 (after):** i18n scaffolding, packaged releases (Flatpak/AppImage/
 Windows exe from the PyInstaller base), accessibility pass, first public tag.
 
+**P5.6 done — v0.1.0 released (2026-10-18):**
+https://github.com/martintondel02/meshdeck/releases/tag/v0.1.0
+Assets: `meshdeck-0.1.0-x86_64.tar.gz`, `meshdeck-0.1.0-x86_64.AppImage`,
+`SHA256SUMS`. Re-downloaded and re-verified: checksums pass, both print
+`meshdeck 0.1.0`, extracted binary serves UI + authenticated API. Flatpak
+remains unverified; screen-reader/keyboard-only walkthroughs and a timed
+fresh-clone onboarding were not run.
+
 **Phase 5 started (2026-10-18):** GitHub Actions CI
 (`.github/workflows/ci.yml`): `backend` matrix over Python 3.12/3.13/3.14
 (ruff + unit tests), `frontend` (pnpm `check`/`test`/`build`, pnpm + pip

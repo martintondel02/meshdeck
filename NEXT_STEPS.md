@@ -538,7 +538,17 @@ ticked by actually doing it; `pnpm run check` still 0 warnings.
 **Acceptance:** a person who has never seen the repo can go from clone to
 chatting with a second instance using only the README.
 
-### P5.6 — Versioning & the v0.1.0 tag
+### P5.6 — Versioning & the v0.1.0 tag  ✅ DONE
+
+> **Landed (2026-10-18):** `meshdeck/version.py` + `pyproject.toml` = `0.1.0`;
+> CHANGELOG Unreleased → `[0.1.0] - 2026-10-18`; README/SECURITY updated.
+> Rebuilt artifacts from the tagged tree and verified:
+> `meshdeck-0.1.0-x86_64.tar.gz` and `meshdeck-0.1.0-x86_64.AppImage`, both
+> `sha256sum -c` clean and both print `meshdeck 0.1.0`. Annotated tag `v0.1.0`
+> pushed; GitHub release created with tarball + AppImage + `SHA256SUMS`.
+> Re-downloaded the release assets, checked checksums, ran both binaries, and
+> served the extracted binary standalone (UI 200, authenticated API 200,
+> `version: 0.1.0`, RNS running).
 
 **Tasks**
 1. `pyproject.toml` version `0.1.0.dev0` → `0.1.0`; `meshdeck/__init__.py`
@@ -602,12 +612,31 @@ after the a11y changes so strings don't churn twice.
 
 ## 6. Definition of done for the whole thing
 
-- [ ] `make test`, `ruff`, `pnpm run check`, `pnpm run test`, `pnpm run build`
-      all green; CI badge green on `main`.
-- [ ] Two fresh installs discover each other and chat, send a file both ways,
-      host + browse pages, host + download node files, all verified in the
-      running UI (not just tests).
-- [ ] A stranger follows the README, installs, and chats in under ten minutes.
-- [ ] `v0.1.0` released with a binary that runs standalone and a changelog
-      that matches reality.
-- [ ] No user-facing string outside `lib/i18n/en.ts`; a11y checklist complete.
+- [x] `make test`, `ruff`, `pnpm run check`, `pnpm run test`, `pnpm run build`
+      all green; CI badge green on `main` (backend 3.12/3.13/3.14, frontend,
+      integration job non-blocking). Final release commit + docs run: see the
+      CI run on `6e26e4e`/the docs follow-up.
+- [x] Two fresh installs discover each other and chat, send files, host +
+      browse pages, host + download node files. Verified with real two-node
+      integration tests (11 passed, 73.8 s) **and** per-flow browser E2E:
+      peer list/chat+attachment, 8 MiB progress bar + SHA match, page reader
+      with links/back, cached/stale copy. Not one uninterrupted manual
+      walkthrough of every flow in a single session.
+- [ ] A stranger follows the README, installs, and chats in under ten minutes —
+      **not verified** (no second person / timed fresh-clone run).
+- [x] `v0.1.0` released with binaries that run standalone and a changelog that
+      matches reality (downloaded from GitHub, checksums + `--version` + UI/API
+      re-verified).
+- [ ] No user-facing string outside `lib/i18n/en.ts` (frontend done; backend
+      error *codes* remain machine strings); a11y checklist **not complete**:
+      keyboard-only and screen-reader walkthroughs were never run. See
+      `docs/a11y-checklist.md`.
+
+### Known gaps after v0.1.0 (honest list)
+
+- Flatpak manifest is unbuilt/unverified (`flatpak-builder` absent).
+- Screen-reader and keyboard-only end-to-end walkthroughs were not performed.
+- Fresh-clone ten-minute onboarding was not timed with a real stranger.
+- Release binaries are Linux x86_64 built against this host's glibc; no
+  Windows/macOS builds.
+- Runtime locale switching needs a reload; only English ships.
