@@ -378,7 +378,20 @@ with one tag.
 README. Verify by pushing a throwaway commit that breaks a test, then reverting
 (do this on a branch, not main, to keep history clean).
 
-### P5.2 — Release artifacts (tarball now, AppImage if tooling allows)
+### P5.2 — Release artifacts (tarball now, AppImage if tooling allows)  ✅ DONE (Flatpak unverified)
+
+> **Landed (2026-10-18):** `packaging/meshdeck.svg` (256×256 node grid),
+> `meshdeck.desktop`, `release.sh` (frontend → `make package` → tarball with
+> binary/desktop/icon/README/LICENSE + SHA256SUMS + extracted `--version`
+> self-check), `appimage.sh` (AppDir + appimagetool, downloads the official
+> continuous build if absent, fails cleanly otherwise), and the Flatpak
+> manifest. `packaging/README.md` records verified vs unverified.
+> Independently verified in this session: `sha256sum -c` passes for both
+> artifacts; tarball lists exactly the five files; extracted binary and the
+> AppImage both print `meshdeck 0.1.0.dev0`. Flatpak is **UNVERIFIED**:
+> `flatpak-builder` is not installed, so the manifest (and its
+> `org.freedesktop.Platform//24.08` runtime claim) has never been built.
+> Artifacts will be rebuilt at 0.1.0 for P5.6.
 
 **Tasks**
 1. Icon + desktop file: `packaging/meshdeck.svg` (simple, MIT-clean glyph —

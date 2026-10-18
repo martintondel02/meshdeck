@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=MeshDeck
+GenericName=Reticulum Mesh Client
+Comment=Chat, share files and host pages over Reticulum
+Exec=meshdeck
+Icon=meshdeck
+Terminal=false
+Categories=Network;Chat;
+Keywords=reticulum;lxmf;mesh;chat;files;pages;
+StartupNotify=true

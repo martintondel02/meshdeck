@@ -1,0 +1,53 @@
+# Flatpak manifest for MeshDeck.
+#
+# STATUS: UNVERIFIED. The host this manifest was written on has no
+# `flatpak-builder` (and no `flatpak` remote configured), so it has never been
+# built. The runtime/sdk pair below is the intended target and was NOT
+# verified against Flathub's repository; if `org.freedesktop.Platform//24.08`
+# is unavailable on the target machine, replace both versions with a currently
+# supported freedesktop runtime (e.g. 25.08) and re-run the recipe in
+# packaging/README.md.
+#
+# It builds from the source tree (no PyPI release needed) with pip into /app.
+# flatpak-builder needs network access for pip to fetch hatchling + runtime deps.
+#
+# NOTE: the freedesktop SDK has no Node/pnpm, so the web UI cannot be built
+# inside the sandbox. The source tree passed to flatpak-builder must already
+# contain a built frontend/dist (`make build-frontend`); the build command below
+# copies it next to the installed package where resolve_static_dir() looks.
+# A clean git clone without that directory would install without a UI.
+# The type: dir source copies the whole working tree, so build from a clean
+# copy (without .venv/ or node_modules/) to keep the build context small.
+app-id: org.meshdeck.MeshDeck
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: meshdeck
+
+finish-args:
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+
+modules:
+  - name: meshdeck
+    buildsystem: simple
+    build-commands:
+      # Install the Python package and all deps into /app (no PyPI release).
+      - python3 -m pip install --no-cache-dir --prefix=/app .
+      # Place the prebuilt web UI where meshdeck resolves static files.
+      # (Compute the /app site-packages path; importing meshdeck here would see
+      # the source tree in the CWD, not the installed copy.)
+      - |
+        UI_DIR="$(python3 -c 'import sysconfig; print(sysconfig.get_path("purelib", vars={"base": "/app", "platbase": "/app"}))')/frontend/dist"
+        install -d "$UI_DIR"
+        cp -a frontend/dist/. "$UI_DIR/"
+      # Desktop entry + icon, exported under the Flatpak app ID.
+      - install -Dm644 packaging/meshdeck.desktop /app/share/applications/org.meshdeck.MeshDeck.desktop
+      - install -Dm644 packaging/meshdeck.svg /app/share/icons/hicolor/scalable/apps/org.meshdeck.MeshDeck.svg
+      - install -Dm644 packaging/meshdeck.svg /app/share/icons/hicolor/scalable/apps/meshdeck.svg
+      - sed -i 's|^Icon=.*|Icon=org.meshdeck.MeshDeck|' /app/share/applications/org.meshdeck.MeshDeck.desktop
+    sources:
+      - type: dir
+        path: ../..

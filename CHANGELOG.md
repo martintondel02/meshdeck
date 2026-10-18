@@ -4,6 +4,19 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added (Phase 5 — release artifacts)
+
+- `packaging/release.sh`: builds the UI + one-file binary and produces
+  `meshdeck-<version>-x86_64.tar.gz` (binary, desktop file, icon, README,
+  LICENSE) with `SHA256SUMS`, verifying the extracted binary's `--version`.
+- `packaging/appimage.sh`: genuine AppImage build via appimagetool (downloads
+  the official continuous build if needed; fails cleanly if unavailable).
+- Icon (`meshdeck.svg`), desktop entry, and a Flatpak manifest.
+- **Verified**: tarball and AppImage built, checksummed, extracted/run
+  (`meshdeck 0.1.0.dev0`), UI + API served. **Unverified**: Flatpak —
+  `flatpak-builder` is absent, so the manifest is untested (documented in
+  `packaging/README.md`).
+
 ### Added (Phase 4 — page cache)
 
 - Offline browsing: every successfully fetched page is cached (DB schema v3,

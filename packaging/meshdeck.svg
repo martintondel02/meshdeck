@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="meshdeck-title meshdeck-desc">
+  <title id="meshdeck-title">MeshDeck</title>
+  <desc id="meshdeck-desc">A grid of connected nodes, representing a mesh network.</desc>
+  <rect width="256" height="256" rx="48" fill="#0b1220"/>
+  <g fill="none" stroke="#2a7f8c" stroke-width="7" stroke-linecap="round">
+    <path d="M64 64H192M64 128H192M64 192H192"/>
+    <path d="M64 64V192M128 64V192M192 64V192"/>
+  </g>
+  <g stroke="#0b1220" stroke-width="5">
+    <circle cx="64" cy="64" r="13" fill="#5eead4"/>
+    <circle cx="128" cy="64" r="13" fill="#5eead4"/>
+    <circle cx="192" cy="64" r="13" fill="#5eead4"/>
+    <circle cx="64" cy="128" r="13" fill="#5eead4"/>
+    <circle cx="192" cy="128" r="13" fill="#5eead4"/>
+    <circle cx="64" cy="192" r="13" fill="#5eead4"/>
+    <circle cx="128" cy="192" r="13" fill="#5eead4"/>
+    <circle cx="192" cy="192" r="13" fill="#5eead4"/>
+    <circle cx="128" cy="128" r="18" fill="#fbbf24"/>
+  </g>
+</svg>

@@ -764,6 +764,13 @@ kill-the-host integration test and a browser run of the cached/stale badges.
 **Phase 4 remaining:** `/media` handler (image conversion needs Pillow;
 deferred), executable pages (deliberately not supported).
 
+**P5.2 done, Flatpak unverified (2026-10-18):** release tarball + genuine
+AppImage + icon/desktop entry + Flatpak manifest. Independently re-verified:
+`sha256sum -c`, tarball contents, and `--version` from both the extracted
+tarball and the AppImage (`meshdeck 0.1.0.dev0`). `flatpak-builder` is not
+installed, so the manifest has never been built — `packaging/README.md` says
+so and lists the exact recipe. Rebuild at 0.1.0 for the tag.
+
 **P4.5 + P4.4 done (2026-10-18):** vitest suite (26 tests) plus the reader
 fix. Two real bugs were found by browser E2E that the unit/integration suites
 had missed: (a) micron links were HTML-escaped into text because escaping ran
