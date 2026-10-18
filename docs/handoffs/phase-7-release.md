@@ -90,8 +90,10 @@ The RPM was extracted with `rpm2cpio | cpio -idm` and its
   with tarball, AppImage, RPM and `SHA256SUMS`.
 - Release assets were downloaded again and re-verified (checksums, versions);
   see the final report for the exact commands/output.
-- CI: backend (3.12/3.13/3.14), frontend, and the integration job were checked
-  on the release commit; see the final report for the run URL/status.
+- CI run: https://github.com/martintondel02/meshdeck/actions/runs/39173927203
+  (`success`): frontend, backend 3.12/3.13/3.14, and the `integration
+  (non-blocking)` job all completed successfully on the release commit
+  `1de158b` (tag `v0.2.0`).
 
 ## Verified vs unverified
 

@@ -746,7 +746,8 @@ gate is the tagged commit.
 | Flatpak | build + install + `--version` + UI/API 200 on 26.08 |
 | Fresh clone | clone → two instances → text+file = **9.3 s** (warm caches) |
 | Artifacts | tarball, AppImage, RPM rebuilt; `sha256sum -c`; each `--version`; RPM extracted and run |
-| Release | assets re-downloaded, checksums/versions re-checked, UI+API served |
+| Release | [v0.2.0](https://github.com/martintondel02/meshdeck/releases/tag/v0.2.0); assets re-downloaded, checksums/versions re-checked, UI+API served |
+| CI | [run 39173927203](https://github.com/martintondel02/meshdeck/actions/runs/39173927203) success (backend 3.12/3.13/3.14, frontend, integration) |
 
 ### Unverified / limitations (must stay honest)
 
