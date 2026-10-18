@@ -1,5 +1,7 @@
 # MeshDeck
 
+[![CI](https://github.com/martintondel02/meshdeck/actions/workflows/ci.yml/badge.svg)](https://github.com/martintondel02/meshdeck/actions/workflows/ci.yml)
+
 > An all-in-one Reticulum application — chat, file sharing, page hosting and network infrastructure, with a basic mode for everyone and an advanced mode for tinkerers.
 
 **Status:** early development (Phase 1). Working title "MeshDeck" — final name TBD.

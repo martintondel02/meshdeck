@@ -737,6 +737,13 @@ transfer-progress UI for very large responses.
 **Phase 5 (after):** i18n scaffolding, packaged releases (Flatpak/AppImage/
 Windows exe from the PyInstaller base), accessibility pass, first public tag.
 
+**Phase 5 started (2026-10-18):** GitHub Actions CI
+(`.github/workflows/ci.yml`): `backend` matrix over Python 3.12/3.13/3.14
+(ruff + unit tests), `frontend` (pnpm `check`/`test`/`build`, pnpm + pip
+caches), and a `continue-on-error` `integration` job (20 min timeout) that
+spawns real RNS nodes. CI badge added to the README. The frontend `test`
+step becomes effective with the vitest suite in P4.5.
+
 ---
 
 ## 16. RNS/LXMF integration recipe (appendix: the critical path)

@@ -299,7 +299,13 @@ Backend has 39 unit tests; the renderer has none and it is security-relevant
 Goal: a stranger can install it, trust it, and a maintainer can ship updates
 with one tag.
 
-### P5.1 — CI on GitHub Actions  ★ do first (cheap, catches regressions)
+### P5.1 — CI on GitHub Actions  ★ do first (cheap, catches regressions)  ✅ DONE
+
+> **Landed (2026-10-18):** `.github/workflows/ci.yml` with `backend`
+> (3.12/3.13/3.14 matrix: install → ruff → unit tests), `frontend`
+> (pnpm install --frozen-lockfile → check → test → build), and a
+> `continue-on-error` `integration` job (20 min). README badge added.
+> `pnpm run test` is wired now and exercised by the P4.5 vitest work.
 
 **Tasks**
 1. `.github/workflows/ci.yml`:

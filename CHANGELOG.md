@@ -4,6 +4,13 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added (Phase 5 — release readiness)
+
+- Continuous integration on GitHub Actions: backend lint + unit tests on
+  Python 3.12/3.13/3.14, frontend type-check/test/build with dependency
+  caching, and a non-blocking integration job running the real two-node RNS
+  tests. CI badge in the README.
+
 ### Added (Phase 4 — node file sharing)
 
 - File hosting on your node: `/file/<name>` handlers using NomadNet's scheme
