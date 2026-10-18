@@ -693,3 +693,9 @@ in `/status` and Settings, with Clear cache. Limits reject invalid input with
   or validated by a listener — still open.
 - ✅ Timed fresh-clone onboarding: 9.3 s end-to-end (warm caches); README
   two-instance AutoInterface step fixed.
+- ✅ **Phase 7.4 interop:** real `nomadnet 1.4.4`, `lxmf 1.2.1` (direct
+  both ways), `lxmd` as a propagation node (offline store-and-forward), and
+  MeshDeck hosting with an independent sender/receiver all passed on loopback.
+  `docs/interop.md` has versions, evidence and the untested list (Sideband,
+  Android, NomadNet TUI, autopeering, large transfers). Opt-in tests:
+  `tests/interop/` (`-m interop`).

@@ -108,6 +108,35 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
   for hosting-on/off shapes, auth coverage, and a real-daemon Playwright DOM
   smoke (dashboard + Refresh, 0 console errors).
 
+### Verified (Phase 7.4 — interop with real NomadNet / lxmd / official lxmf)
+
+- New `docs/interop.md` records exact versions (`nomadnet 1.4.4`,
+  `lxmf 1.2.1`, `rns 1.5.7`) and what was genuinely independent.
+- **NomadNet hosts → MeshDeck browses:** a real `nomadnet -d` node served
+  `index.mu`; MeshDeck's production `/api/v1/browse` returned the identical
+  bytes over a real RNS link (52 ms).
+- **MeshDeck hosts → independent client fetches:** a separate official-RNS-only
+  process fetched MeshDeck's page over `RNS.Link` and got byte-identical
+  content. Labelled **protocol-level, not an independent UI**: NomadNet's
+  browser is urwid-TextUI-only and was not driven headlessly.
+- **LXMF direct, both directions:** a standalone official-`lxmf` peer received
+  MeshDeck's message (correct sender hash, valid signature) and MeshDeck
+  received the peer's message with the correct `peer_hash`.
+- **lxmd propagation node:** `lxmd -p` stored a propagated message from
+  MeshDeck while the peer was offline; the peer later synced from lxmd and
+  received it (valid signature).
+- **MeshDeck hosting:** an independent official-`lxmf` sender submitted a
+  propagated message to MeshDeck's node, and an independent receiver synced it
+  back; `/api/v1/propagation` reported `stored_messages: 1`,
+  `store_bytes: 272`, `messages_received: 1`.
+- `tests/interop/` adds four opt-in tests (marker `interop`, skipped unless
+  `MESHDECK_INTEROP_PYTHON` / `_NOMADNET` / `_LXMD` are set); they passed
+  in 76 s on loopback. Note: `pip install nomadnet lxmd` fails — `lxmd` is not
+  a PyPI distribution; it ships with `lxmf`, so `pip install nomadnet lxmf`
+  is the working command.
+- Not tested: Sideband/Android, NomadNet's TUI browser, lxmd autopeering,
+  large transfers, stamp costs above the minimum, cross-platform binaries.
+
 ## [0.1.1] - 2026-10-19
 
 ### Added (Phase 6 — post-release hardening)

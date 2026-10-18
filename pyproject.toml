@@ -45,9 +45,10 @@ packages = ["meshdeck"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-m 'not integration'"
+addopts = "-m 'not integration and not interop'"
 markers = [
     "integration: tests that spawn real RNS/LXMF subprocesses (run with -m integration)",
+    "interop: opt-in tests against external NomadNet/lxmd/official-lxmf binaries (run with -m interop)",
 ]
 
 [tool.ruff]
