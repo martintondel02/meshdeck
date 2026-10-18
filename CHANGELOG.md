@@ -4,6 +4,19 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Fixed (Phase 4 — micron reader)
+
+- **Browsing pages from the UI actually works now.** The REST browse route
+  captured paths without a leading slash and the service prefixed `/page/`
+  again, so every fetch requested `/page/page/…` and timed out after 25 s.
+  Integration tests missed it because they call the service directly.
+- Internal micron links render as real links again (they used to be
+  HTML-escaped into visible text, so no reader link could work). The reader
+  follows them in place and has a ← back stack for multi-page nodes.
+- Micron: `` `[literal]` `` inline code spans, documented `` `!``/`_`/`*`
+  formatting toggles, unknown backtick tokens are stripped instead of leaking,
+  and pages over 512 KiB are refused with a notice. 26 renderer unit tests.
+
 ### Added (Phase 5 — release readiness)
 
 - Continuous integration on GitHub Actions: backend lint + unit tests on

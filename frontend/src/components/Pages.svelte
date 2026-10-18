@@ -35,6 +35,7 @@
   let browsing = $state(false);
   let browseErr = $state("");
   let pageResult = $state<BrowseResult | null>(null);
+  let back = $state<{ hash: string; path: string }[]>([]);
 
   onMount(() => {
     loadAll();
@@ -131,21 +132,67 @@
     }
   }
 
-  async function browse() {
+  function normalizePath(raw: string): string {
+    let path = raw.trim() || "/page/index.mu";
+    if (!path.startsWith("/")) path = "/" + path;
+    return path.startsWith("/page/") || path.startsWith("/file/") ? path : "/page/" + path;
+  }
+
+  async function fetchPage(node: string, path: string) {
     browsing = true;
     browseErr = "";
     pageResult = null;
     try {
-      let path = browsePath.trim() || "/page/index.mu";
-      if (!path.startsWith("/")) path = "/" + path;
       pageResult = await api<BrowseResult>(
-        `/api/v1/browse/${encodeURIComponent(browseHash.trim())}${path.startsWith("/page/") ? path : "/page/" + path}`,
+        `/api/v1/browse/${encodeURIComponent(node)}${path}`,
       );
     } catch (e) {
       browseErr = browseErrorText(e);
     } finally {
       browsing = false;
     }
+  }
+
+  async function browse() {
+    const node = browseHash.trim();
+    if (!node) return;
+    const path = normalizePath(browsePath);
+    browseHash = node;
+    browsePath = path;
+    back = [];
+    await fetchPage(node, path);
+  }
+
+  // Internal micron links carry data-node/data-path; navigate in place instead
+  // of doing nothing (or jumping to the top with href="#").
+  async function followLink(ev: MouseEvent) {
+    const target = ev.target;
+    if (!(target instanceof Element)) return;
+    const anchor = target.closest("a.micron-link");
+    if (!(anchor instanceof HTMLAnchorElement)) return;
+    ev.preventDefault();
+    const node = anchor.dataset.node || browseHash;
+    if (!node) return;
+    const path = normalizePath(anchor.dataset.path || "/page/index.mu");
+    back = [...back, { hash: browseHash, path: browsePath }];
+    browseHash = node;
+    browsePath = path;
+    await fetchPage(node, path);
+  }
+
+  async function goBack() {
+    const prev = back.at(-1);
+    if (!prev) return;
+    back = back.slice(0, -1);
+    browseHash = prev.hash;
+    browsePath = prev.path;
+    await fetchPage(prev.hash, prev.path);
+  }
+
+  function readerLinks(node: HTMLElement) {
+    const handler = (ev: Event) => void followLink(ev as MouseEvent);
+    node.addEventListener("click", handler);
+    return { destroy: () => node.removeEventListener("click", handler) };
   }
 
   function browseErrorText(e: unknown): string {
@@ -401,15 +448,29 @@
       <p class="text-xs text-wp-danger">{browseErr}</p>
     {/if}
 
-    {#if pageResult}
+    {#if pageResult || browseErr || back.length > 0}
       <div class="border-t border-wp-border pt-3">
-        <p class="text-xs text-wp-dim mb-2">
-          {pageResult.path} — {pageResult.bytes} bytes, {pageResult.elapsed_ms}
-          ms via on-network link
-        </p>
-        <div class="micron bg-wp-bg rounded-lg p-4 text-sm">
-          {@html renderMicron(pageResult.content)}
+        <div class="flex flex-wrap items-center gap-2 mb-2 text-xs text-wp-dim">
+          {#if back.length > 0}
+            <button
+              class="hover:text-wp-accent"
+              onclick={goBack}
+              title="back to the previous page">← back</button
+            >
+          {/if}
+          {#if pageResult}
+            <span class="font-mono break-all">{pageResult.path}</span>
+            <span
+              >— {pageResult.bytes} bytes, {pageResult.elapsed_ms} ms via on-network
+              link</span
+            >
+          {/if}
         </div>
+        {#if pageResult}
+          <div class="micron bg-wp-bg rounded-lg p-4 text-sm" use:readerLinks>
+            {@html renderMicron(pageResult.content)}
+          </div>
+        {/if}
       </div>
     {/if}
   </section>
@@ -537,6 +598,19 @@
   .micron :global(a) {
     color: var(--color-wp-accent);
     text-decoration: underline;
+  }
+  .micron :global(.micron-link) {
+    cursor: pointer;
+  }
+  .micron :global(.micron-inline-code) {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 0.25rem;
+    padding: 0 0.25rem;
+    font-family: monospace;
+    font-size: 0.85em;
+  }
+  .micron :global(.micron-notice) {
+    color: var(--color-wp-danger);
   }
   .micron :global(hr) {
     border-color: var(--color-wp-border);

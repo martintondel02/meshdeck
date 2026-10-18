@@ -239,7 +239,20 @@ node others can use when peers are offline.
   `status.propagation_hosting`) and file the end-to-end as follow-up **without
   claiming it verified**.
 
-### P4.4 — Micron reader polish (real bug + small features)  ★ small
+### P4.4 — Micron reader polish (real bug + small features)  ★ small  ✅ DONE
+
+> **Landed (2026-10-18):** the reader bug was worse than described — links
+> never reached the DOM as anchors at all (escaping ran *after* markup
+> generation), and every UI page fetch timed out because the REST route
+> dropped the leading slash and `browse_page` re-prefixed `/page/`
+> (`/page/page/…`). Both fixed. Added a reader action that intercepts
+> `a.micron-link` clicks (relative links use the current node), a ← back
+> stack, inline `` `[literal]` `` spans, documented `` `!``/`_`/`*` toggles,
+> unknown-backtick stripping, and a 512 KiB render cap. 16 new vitest cases
+> (26 total). Verified in headless Chromium with two real daemons over TCP:
+> Home → link → Second page → ← back → Home, 0 `#/browse/` anchors.
+> Screenshots: `/tmp/p44-page1.png`, `/tmp/p44-page2.png` (not committed).
+> See BUILD_PLAN §14.21/§14.22.
 
 **Bug (fix first):** internal links rendered by `lib/micron.ts` emit
 `<a href="#/browse/…" data-node=… data-path=…>`, but nothing handles the click

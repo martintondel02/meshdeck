@@ -32,7 +32,7 @@ from meshdeck.config import (
     SettingsStore,
 )
 from meshdeck.core.events import Event, EventBus
-from meshdeck.pages.client import PageFetchError, fetch_file, fetch_page
+from meshdeck.pages.client import PageFetchError, fetch_file, fetch_page, normalize_page_path
 from meshdeck.pages.files import SharedFileError
 from meshdeck.pages.hosting import NodeAnnounceHandler, PageHost
 from meshdeck.pages.storage import PageNameError
@@ -578,8 +578,7 @@ class CoreService:
     async def browse_page(
         self, node_hash: str, path: str
     ) -> dict[str, Any]:
-        if not path.startswith("/page/"):
-            path = "/page/" + path.lstrip("/")
+        path = normalize_page_path(path)
         started = time.time()
         try:
             data = await asyncio.wait_for(

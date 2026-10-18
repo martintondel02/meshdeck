@@ -23,6 +23,20 @@ class PageFetchError(Exception):
     """Machine-readable failure codes are in str(exc)."""
 
 
+def normalize_page_path(path: str) -> str:
+    """Return a node request path with a leading slash and the /page/ prefix.
+
+    aiohttp's ``{path:.+}`` capture omits the leading slash, so the REST layer
+    hands us ``page/index.mu``; direct service callers pass
+    ``/page/index.mu``. Both must map to the same request path (a naive
+    prefix check produced ``/page/page/index.mu`` and a silent link timeout).
+    """
+    normalized = "/" + path.strip().lstrip("/")
+    if not normalized.startswith("/page/"):
+        normalized = "/page/" + normalized.lstrip("/")
+    return normalized
+
+
 def fetch_path(
     node_hash_hex: str,
     path: str,

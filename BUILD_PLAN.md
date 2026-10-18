@@ -644,6 +644,25 @@ phase; Playwright optional from Phase 5.
     loop mines the PoW in a worker pool and re-packs (hash unchanged — the
     stamp is outside the hashed payload). Pass the peer's announced
     stamp_cost; `include_ticket=True` lets them reply free.
+19. **RNS validates response-generator arity exactly**: request handlers must
+    take six params `(path, data, request_id, link_id, remote_identity,
+    requested_at)`. A `*args` variant dies in the Link job thread with
+    "Invalid signature for response generator callback" and the client only
+    sees a link that never answers.
+20. **aiohttp matches routes in registration order**: register
+    `/browse/{hash}/file/{name}` BEFORE the `/browse/{hash}/{path:.+}`
+    catch-all, or file downloads are swallowed by the page handler.
+21. **`{path:.+}` drops the leading slash**: the REST route hands
+    `browse_page` `page/index.mu`, while direct service callers pass
+    `/page/index.mu`. A naive `startswith("/page/")` check produced
+    `/page/page/index.mu`, so every UI page fetch timed out after 25 s with
+    `link_timeout` while integration tests (which called the service
+    directly) stayed green. Normalise both forms in
+    `pages.client.normalize_page_path` (unit-tested).
+22. **Never escape generated markup together with page text**: the micron
+    renderer escaped links along with their labels, so `<a>` reached the DOM
+    as text and no reader link worked. Escape text at the point of insertion
+    and build tags afterwards; unit-test the DOM shape, not just safety.
 
 ---
 
@@ -733,6 +752,17 @@ page handler.
 **Phase 4 remaining:** `/media` handler (image conversion needs Pillow;
 deferred), page caching, executable pages (deliberately not supported),
 transfer-progress UI for very large responses.
+
+**P4.5 + P4.4 done (2026-10-18):** vitest suite (26 tests) plus the reader
+fix. Two real bugs were found by browser E2E that the unit/integration suites
+had missed: (a) micron links were HTML-escaped into text because escaping ran
+after markup generation, and (b) the REST browse route dropped the leading
+slash and the service re-prefixed `/page/`, producing `/page/page/...` and a
+25 s timeout — so browsing from the UI had never worked. Fixed both, added
+`normalize_page_path` + tests, and verified with headless Chromium against
+two real daemons over a TCP link: page 1 → click link → page 2 → ← back →
+page 1. Reader now has a back stack, inline `` `[literal]` `` spans, stripped
+unknown backtick tokens, and a 512 KiB render cap.
 
 **Phase 5 (after):** i18n scaffolding, packaged releases (Flatpak/AppImage/
 Windows exe from the PyInstaller base), accessibility pass, first public tag.

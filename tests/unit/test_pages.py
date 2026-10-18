@@ -6,7 +6,18 @@ from pathlib import Path
 
 import pytest
 
+from meshdeck.pages.client import normalize_page_path
 from meshdeck.pages.storage import PageNameError, PageStore, validate_page_name
+
+
+def test_normalize_page_path_accepts_both_forms() -> None:
+    # aiohttp's {path:.+} capture omits the leading slash; direct callers keep
+    # it. Regression: the REST form used to become /page/page/index.mu.
+    assert normalize_page_path("page/index.mu") == "/page/index.mu"
+    assert normalize_page_path("/page/index.mu") == "/page/index.mu"
+    assert normalize_page_path("index.mu") == "/page/index.mu"
+    assert normalize_page_path("/index.mu") == "/page/index.mu"
+    assert normalize_page_path("docs/install.mu") == "/page/docs/install.mu"
 
 
 def test_valid_names(tmp_path: Path) -> None:
