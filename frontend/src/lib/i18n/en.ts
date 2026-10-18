@@ -222,6 +222,23 @@ export const en = {
     hosting_error: "Could not change propagation hosting.",
     host_warn:
       "Keep this machine online. Messages are stored encrypted, but their timing and size are visible to you as the operator.",
+    propagation_store_usage: "Store usage: {used} of {limit}",
+    propagation_store_usage_unlimited: "Store usage: {used} (no limit)",
+    propagation_store_not_hosting: "Not hosting — no messages are stored on disk.",
+    propagation_limit_label: "Store limit (MB, 0 = unlimited)",
+    propagation_limit_hint:
+      "LXMF removes the oldest messages once the store is over this limit; it checks about every two minutes.",
+    propagation_limit_saved: "Storage limit saved.",
+    propagation_limit_invalid: "Enter a whole number from 0 to 10240.",
+    storage_section: "Storage",
+    page_cache_usage: "Page cache: {used} of {limit}",
+    page_cache_usage_unlimited: "Page cache: {used} (no limit set)",
+    page_cache_hint:
+      "Pages you visit are cached so you can still read them when a node goes offline. The oldest pages are dropped first when the cache is full.",
+    clear_cache: "Clear cache",
+    cache_cleared_one: "Cache cleared — {count} page removed.",
+    cache_cleared_other: "Cache cleared — {count} pages removed.",
+    cache_clear_failed: "Could not clear the cache.",
     glossary: "Glossary",
     restart_required: "Restart required for connection changes.",
     footer: "MeshDeck v{version} · uptime {seconds}s",
