@@ -69,6 +69,13 @@ export interface Status {
   uptime_seconds: number;
   propagation_hosting: boolean;
   propagation_node_hash: string;
+  // Phase 6.3 disk usage (null/0 meanings documented on the status endpoint).
+  page_cache_bytes: number;
+  page_cache_entries: number;
+  page_cache_max_bytes: number;
+  propagation_store_bytes: number | null;
+  propagation_storage_limit_mb: number;
+  propagation_storage_limit_bytes: number;
 }
 
 export const identity = writable<IdentityInfo | null>(null);

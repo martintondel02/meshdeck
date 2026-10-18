@@ -1,7 +1,6 @@
 <script lang="ts">
   import { api } from "../lib/api";
   import { identity, mode, settings, status } from "../lib/stores";
-  import type { Status } from "../lib/stores";
   import { wsCmd } from "../lib/ws";
   import Tooltip from "./Tooltip.svelte";
   import InterfacesCard from "./InterfacesCard.svelte";
@@ -12,17 +11,8 @@
   let copied = $state(false);
   let restartNote = $state(false);
 
-  // Phase 6.3 storage fields live on /status but the shared Status type in
-  // stores.ts is owned elsewhere, so widen it locally.
-  type StorageStatus = {
-    page_cache_bytes?: number;
-    page_cache_entries?: number;
-    page_cache_max_bytes?: number;
-    propagation_store_bytes?: number | null;
-    propagation_storage_limit_mb?: number;
-    propagation_storage_limit_bytes?: number;
-  };
-  const live = $derived(($status ?? null) as (Status & StorageStatus) | null);
+  // Phase 6.3 disk-usage fields are part of the shared Status type.
+  const live = $derived($status);
 
   // Page cache sizes are binary (the cap is 64 MiB); the propagation store is
   // decimal because LXMF's limit is decimal MB.
@@ -50,7 +40,7 @@
 
   async function refreshStatus() {
     try {
-      status.set(await api<Status & StorageStatus>("/api/v1/status"));
+      status.set(await api("/api/v1/status"));
     } catch {
       /* the 5 s status poll in App.svelte will catch up */
     }

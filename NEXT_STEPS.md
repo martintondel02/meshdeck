@@ -640,3 +640,39 @@ after the a11y changes so strings don't churn twice.
 - Release binaries are Linux x86_64 built against this host's glibc; no
   Windows/macOS builds.
 - Runtime locale switching needs a reload; only English ships.
+
+---
+
+## 7. Phase 6 — post-v0.1.0 hardening (done 2026-10-19)
+
+Three parallel sessions, merged via PRs (see `docs/handoffs/`). All verification
+commands were rerun after merge.
+
+### P6.1 — HTTP route contract tests  ✅
+`tests/api/test_routes.py` boots two real CLI daemons and exercises the routes
+the UI calls: browse page/file, shared files, attachments, auth, node
+discovery, settings validation. Reproduces the v0.1.0 bug class by asserting
+the exact `path` value and the file-route ordering.
+
+### P6.2 — Boot-from-settings matrix  ✅
+`tests/integration/test_boot_settings.py` proves six persisted settings are
+actually applied at boot (propagation store exists on disk, node announce,
+delivery/propagation node, RNS transport flag, structured interface, mode).
+No product bugs found; the harness now supports `--set KEY=JSON` and an
+optional API server.
+
+### P6.3 — Bounded disk usage  ✅
+Page cache: hard 64 MiB total ceiling (configurable 0…1 GiB, oldest-first
+eviction per write). Propagation store: 256 MB default cap via LXMF's own API
+(0…10240 MB, 0 = unlimited), enforced by LXMF's periodic clean job. Usage is
+in `/status` and Settings, with Clear cache. Limits reject invalid input with
+400.
+
+### Remaining follow-ups
+- Cap the other unbounded stores: chat attachments (kept forever), node-shared
+  files, hosted pages, SQLite history, logs.
+- Expose `page_cache_max_bytes` in the UI (currently API-only).
+- LXMF store-cap enforcement is periodic; optionally surface "will shrink
+  within ~2 min" in the UI.
+- Flatpak build; screen-reader/keyboard-only walkthrough; timed fresh-clone
+  onboarding.

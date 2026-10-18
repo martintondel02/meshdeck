@@ -2,6 +2,42 @@
 
 All notable changes to MeshDeck. Format based on Keep a Changelog.
 
+## [0.1.1] - 2026-10-19
+
+### Added (Phase 6 — post-release hardening)
+
+- **HTTP route contract tests** (8, `tests/api/test_routes.py`): boot the real
+  CLI and speak HTTP with its bearer token over a loopback two-node pair.
+  Covers browse page paths (the `/page/page/…` bug class), browse file route
+  ordering, shared files upload/list/download/delete, attachment downloads,
+  auth on every route, `/node` vs `/nodes`, and settings validation.
+- **Boot-from-settings matrix** (6, `tests/integration/test_boot_settings.py`):
+  proves persisted settings are applied on boot, not just echoed by `/status` —
+  propagation hosting creates LXMF's real message store, `serve_pages` +
+  `node_name` announce, propagated delivery + node apply, `transport_enabled`
+  reaches RNS, structured interfaces come up online, advanced mode persists.
+  The harness gained `--set KEY=JSON`, an optional API server, and runtime-truth
+  fields in `ready.json`.
+- **Bounded, visible disk usage.** The page cache now has a hard total ceiling
+  (`page_cache_max_bytes`, default 64 MiB, `0` = unlimited) enforced on every
+  write by evicting the oldest pages; the LXMF propagation store is capped via
+  LXMF's own API (`propagation_storage_limit_mb`, default 256 MB,
+  `0` = unlimited). `GET /api/v1/status` reports cache entries/bytes, store
+  bytes and both limits. Settings → Advanced shows store usage + limit and a
+  new *Storage* card with page-cache usage and **Clear cache**
+  (`DELETE /api/v1/page_cache`). Limits are strictly validated (400, never
+  clamped).
+- Tests grew to 80 backend unit, 25 API/integration, 37 frontend.
+
+### Notes
+
+- LXMF enforces the propagation store cap in its own periodic clean job
+  (≈2 minutes), not instantly; the page cache bound is immediate.
+- Chat attachments, node-shared files, hosted pages, message history and logs
+  are still unbounded — a follow-up phase.
+- Flatpak remains unverified, and no screen-reader/keyboard-only walkthrough
+  has been run.
+
 ## [0.1.0] - 2026-10-18
 
 ### Added (Phase 4 — propagation hosting)

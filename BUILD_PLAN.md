@@ -74,7 +74,7 @@ worse, and prefer stdlib. Approved initial set: `rns`, `lxmf`, `aiohttp`,
 
 ## 3. Out of scope (recorded so nobody drifts)
 
-Deferred, with intended phase noted: voice calls (LXST, Phase 6+), maps,
+Deferred, with intended phase noted: voice calls (LXST, later phase), maps,
 Android, plugin system, RRC relay chat, remote/headless multi-user mode,
 Electron/Tauri shells (Phase 5), propagation-node hosting (Phase 4),
 browsing others' NomadNet pages (Phase 3 stretch), I2P interface wizard
@@ -684,6 +684,15 @@ phase; Playwright optional from Phase 5.
 ---
 
 ## 15. Build order checklist (execute in order; commit per step)
+
+**Phase 6 — post-v0.1.0 hardening — DONE 2026-10-19 (v0.1.1).** Three parallel
+PRs: (1) HTTP route contract tests against real CLI daemons; (2) a
+boot-from-settings matrix proving persisted settings apply at startup (six
+cases, harness `--set KEY=JSON`); (3) bounded disk usage — 64 MiB page-cache
+ceiling with oldest-first eviction, 256 MB LXMF propagation-store cap applied
+through LXMF's API, usage in `/status` and Settings, Clear cache. Merged tree:
+80 backend unit, 25 API/integration, 37 frontend tests green; CI green.
+Handoffs: `docs/handoffs/`.
 
 **Phase 1 (MVP) — DONE 2026-10-18.** Verified: 24 unit tests, two-node
 integration test (5.4s), full manual E2E with two daemons over the real

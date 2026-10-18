@@ -7,12 +7,12 @@
 > and network infrastructure behind a browser UI — with a basic mode for people
 > who just want to talk, and an advanced mode for people who want the knobs.
 
-**Status: v0.1.0 — first release.** Chat, contacts, attachments, page hosting
+**Status: v0.1.1 (first release series).** Chat, contacts, attachments, page hosting
 and browsing with an offline cache, shared node files, transfer progress,
 propagation-node hosting, the interface editor and an English-only i18n
 foundation are implemented and covered by unit + integration tests. Prebuilt
 Linux x86_64 artifacts (tarball and AppImage, with checksums) are attached to
-the [v0.1.0 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.0);
+the [v0.1.1 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.1);
 Flatpak remains an unverified manifest. UI and copy may still change. The live
 task list is [NEXT_STEPS.md](NEXT_STEPS.md); the design record is
 [BUILD_PLAN.md](BUILD_PLAN.md).
@@ -36,7 +36,7 @@ traffic you configure, nothing leaves your machine.
 | Contacts | Auto-discovery from announces, add by address, rename, block | — (same) |
 | Pages & node | Create, edit, preview and host micron pages; browse other nodes by address, with a cached copy when a node is unreachable; share files up to 32 MiB | — (same; the Pages tab is available in both modes) |
 | Interfaces | AutoInterface on by default | Editor for Auto, TCP client/server and Backbone client/server interfaces, listen address and port, gateway mode, automatic announce-rate presets for public listeners |
-| Infrastructure | — | Transport-node toggle |
+| Infrastructure | — | Transport-node toggle; propagation-node hosting with a configurable disk cap and usage display |
 | Network status | Connected state, interface count, "announce now" | Live interface table (type, online, bitrate), config pre-flight before a restart, glossary |
 | Help | Built-in Guides tab and inline tooltips | Same, plus a technical glossary |
 
@@ -90,11 +90,11 @@ address from one instance's Settings screen in the other's "add peer" field.
 
 ### Or download a release binary
 
-The [v0.1.0 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.0)
+The [v0.1.1 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.1)
 ships two Linux x86_64 artifacts, with `SHA256SUMS`:
 
-- `meshdeck-0.1.0-x86_64.tar.gz` — extract and run `./meshdeck-0.1.0-x86_64/meshdeck`
-- `meshdeck-0.1.0-x86_64.AppImage` — `chmod +x` and run it directly
+- `meshdeck-0.1.1-x86_64.tar.gz` — extract and run the `meshdeck` binary inside
+- `meshdeck-0.1.1-x86_64.AppImage` — `chmod +x` and run it directly
 
 The web UI is embedded, so neither needs Python installed. Flatpak is **not**
 published: the manifest in `packaging/flatpak/` has never been built
