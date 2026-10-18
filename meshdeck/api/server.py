@@ -129,6 +129,8 @@ class ApiServer:
         app.router.add_delete("/api/v1/shared/{name:.+}", self._shared_delete)
         app.router.add_get("/api/v1/settings", self._get_settings)
         app.router.add_put("/api/v1/settings", self._put_settings)
+        # Page-cache maintenance: usage lives in /status; this drops the cache.
+        app.router.add_delete("/api/v1/page_cache", self._clear_page_cache)
         app.router.add_post("/api/v1/announce", self._announce)
         app.router.add_post("/api/v1/restart", self._restart)
         app.router.add_get("/ws", self._websocket)
@@ -241,6 +243,10 @@ class ApiServer:
                     status=400,
                 )
             raise
+
+    async def _clear_page_cache(self, request: web.Request) -> web.Response:
+        """Drop cached pages. Only the page_cache table is touched."""
+        return _json(self.service.clear_page_cache())
 
     async def _send_file(self, request: web.Request) -> web.Response:
         """Multipart upload: fields 'peer' (hash), 'file' (the payload),

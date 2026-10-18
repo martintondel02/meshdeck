@@ -28,9 +28,12 @@ from meshdeck.chat.router import (
 from meshdeck.config import (
     DEFAULT_SETTINGS,
     DELIVERY_METHODS,
+    PAGE_CACHE_MAX_BYTES_CEILING,
+    PROPAGATION_STORAGE_LIMIT_MB_MAX,
     VALID_MODES,
     AppPaths,
     SettingsStore,
+    coerce_setting_int,
 )
 from meshdeck.core.events import Event, EventBus
 from meshdeck.pages.client import PageFetchError, fetch_file, fetch_page, normalize_page_path
@@ -44,6 +47,7 @@ from meshdeck.storage import messages as msg_repo
 from meshdeck.storage import nodes as node_repo
 from meshdeck.storage import peers as peer_repo
 from meshdeck.storage.db import Database
+from meshdeck.storage.page_cache import DEFAULT_MAX_BYTES as DEFAULT_PAGE_CACHE_BYTES
 from meshdeck.storage.page_cache import PageCache
 from meshdeck.util.hexid import is_valid_hash_hex, is_valid_msg_hash_hex
 
@@ -95,9 +99,9 @@ class CoreService:
         self.db = Database(self.paths.db_path)
         self.db.open()
         self.settings = SettingsStore(self.db)
-        self.page_cache = PageCache(self.db)
-        # Keep offline browsing bounded: <= 500 pages, drop entries older than
-        # 30 days once per boot.
+        self.page_cache = PageCache(self.db, max_bytes=self._page_cache_max_bytes())
+        # Second belt: drop entries older than 30 days and cap the row count
+        # once per boot. The byte ceiling above is enforced on every put.
         self.page_cache.prune()
 
         self.bus.bind(asyncio.get_running_loop())
@@ -126,6 +130,7 @@ class CoreService:
             delivery_method=self.settings.get("delivery_method") or "direct",
             propagation_node_hash=self.settings.get("propagation_node_hash") or "",
             host_propagation_node=bool(self.settings.get("host_propagation_node")),
+            propagation_storage_limit_mb=self._propagation_storage_limit_mb(),
         )
         # NOTE: like RNS.Reticulum, LXMF.LXMRouter installs signal handlers in
         # its constructor — must run on the main thread. Construction is fast.
@@ -255,7 +260,42 @@ class CoreService:
 
     # -- API-facing methods -----------------------------------------------------
 
+    # Disk-usage settings (Phase 6.3). Both are live-applied, never restart.
+
+    def _page_cache_max_bytes(self) -> int:
+        """Stored page-cache ceiling; falls back to the default if corrupt."""
+        value = self.settings.get("page_cache_max_bytes", DEFAULT_PAGE_CACHE_BYTES)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+        return DEFAULT_PAGE_CACHE_BYTES
+
+    def _propagation_storage_limit_mb(self) -> int:
+        value = self.settings.get("propagation_storage_limit_mb", 256)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+        return 256
+
+    def page_cache_usage(self) -> dict[str, Any]:
+        cache = self.page_cache
+        if cache is None:
+            return {"page_cache_bytes": 0, "page_cache_entries": 0, "page_cache_max_bytes": 0}
+        return {
+            "page_cache_bytes": cache.total_bytes(),
+            "page_cache_entries": cache.count(),
+            "page_cache_max_bytes": cache.max_bytes,
+        }
+
+    def clear_page_cache(self) -> dict[str, Any]:
+        """Drop every cached page (safe: only the page_cache table is touched)."""
+        if self.page_cache is None:
+            raise ValueError("not_running")
+        removed = self.page_cache.clear()
+        self.bus.publish("page_cache_cleared", {"removed": removed})
+        log.info("page cache cleared (%s entries)", removed)
+        return {"cleared": removed, **self.page_cache_usage()}
+
     def status(self) -> dict[str, Any]:
+        store_bytes = self.chat.propagation_store_bytes if self.chat else None
         return {
             "version": __version__,
             "mode": self.settings.get("mode"),
@@ -268,6 +308,15 @@ class CoreService:
             "propagation_node_hash": (
                 self.chat.propagation_node_hash_hex if self.chat else ""
             ),
+            # Phase 6.3: disk usage, so hosting doesn't silently fill a disk.
+            # propagation_store_bytes is LXMF's message store (None = not
+            # hosting / unreadable); the limit is in MB, 0 = unlimited.
+            "propagation_store_bytes": store_bytes,
+            "propagation_storage_limit_mb": self._propagation_storage_limit_mb(),
+            "propagation_storage_limit_bytes": (
+                self.chat.propagation_storage_limit_bytes if self.chat else 0
+            ),
+            **self.page_cache_usage(),
         }
 
     def identity_info(self) -> dict[str, Any]:
@@ -443,9 +492,29 @@ class CoreService:
 
     def update_settings(self, updates: dict[str, Any]) -> dict[str, Any]:
         restart_required = False
+        # Validate numeric disk limits before writing anything, so a bad value
+        # in the same PUT cannot leave earlier keys half-applied. Out-of-range
+        # is rejected (400), never silently clamped.
+        limits: dict[str, int] = {}
+        if "page_cache_max_bytes" in updates:
+            limits["page_cache_max_bytes"] = coerce_setting_int(
+                "page_cache_max_bytes",
+                updates["page_cache_max_bytes"],
+                0,
+                PAGE_CACHE_MAX_BYTES_CEILING,
+            )
+        if "propagation_storage_limit_mb" in updates:
+            limits["propagation_storage_limit_mb"] = coerce_setting_int(
+                "propagation_storage_limit_mb",
+                updates["propagation_storage_limit_mb"],
+                0,
+                PROPAGATION_STORAGE_LIMIT_MB_MAX,
+            )
         for key, value in updates.items():
             if key not in EDITABLE_SETTINGS:
                 continue
+            if key in limits:
+                value = limits[key]
             if key == "mode" and value not in VALID_MODES:
                 raise ValueError("invalid_mode")
             if key == "delivery_method" and value not in DELIVERY_METHODS:
@@ -468,6 +537,31 @@ class CoreService:
                 propagation_node_hash=self.settings.get("propagation_node_hash"),
             )
             self.bus.publish("settings_updated", applied)
+        if "page_cache_max_bytes" in limits and self.page_cache is not None:
+            evicted = self.page_cache.set_max_bytes(limits["page_cache_max_bytes"])
+            self.bus.publish(
+                "settings_updated",
+                {
+                    "page_cache_max_bytes": limits["page_cache_max_bytes"],
+                    "page_cache_bytes": self.page_cache.total_bytes(),
+                    "evicted": evicted,
+                },
+            )
+        if "propagation_storage_limit_mb" in limits and self.chat is not None:
+            # LXMF applies the cap in its own store-clean job (within ~2 min
+            # while hosting); we only hand it the value.
+            applied = self.chat.set_propagation_storage_limit_mb(
+                limits["propagation_storage_limit_mb"]
+            )
+            self.bus.publish(
+                "settings_updated",
+                {
+                    "propagation_storage_limit_mb": applied,
+                    "propagation_storage_limit_bytes": (
+                        self.chat.propagation_storage_limit_bytes
+                    ),
+                },
+            )
         if "host_propagation_node" in updates and self.chat is not None:
             wanted = bool(self.settings.get("host_propagation_node"))
             if wanted != self.chat.propagation_hosting:

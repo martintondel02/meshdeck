@@ -10,7 +10,7 @@ from meshdeck.config import AppPaths
 from meshdeck.core.service import CoreService
 from meshdeck.pages.client import PageFetchError
 from meshdeck.storage.db import Database
-from meshdeck.storage.page_cache import MAX_CACHE_BYTES, PageCache
+from meshdeck.storage.page_cache import DEFAULT_MAX_BYTES, MAX_CACHE_BYTES, PageCache
 
 NODE = "ab" * 16
 
@@ -52,6 +52,114 @@ def test_prune_by_age_and_row_cap(tmp_path):
         assert len(rows) == 3
         assert {r["path"] for r in rows} == {"/page/p2.mu", "/page/p3.mu", "/page/p4.mu"}
         assert cache.get(NODE, "/page/old.mu") is None
+
+
+# -- Phase 6.3: total-bytes ceiling ------------------------------------------
+
+
+def test_total_bytes_and_default_cap(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        cache = PageCache(db)
+        assert cache.max_bytes == DEFAULT_MAX_BYTES == 64 * 1024 * 1024
+        assert cache.total_bytes() == 0
+        cache.put(NODE, "/page/a.mu", "12345", fetched_ts=1.0)
+        cache.put(NODE, "/page/b.mu", "678", fetched_ts=2.0)
+        assert cache.total_bytes() == 8
+        assert cache.count() == 2
+
+
+def test_byte_cap_evicts_oldest_until_new_entry_fits(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        cache = PageCache(db, max_bytes=100)
+        assert cache.put(NODE, "/page/a.mu", "a" * 40, fetched_ts=1.0)
+        assert cache.put(NODE, "/page/b.mu", "b" * 40, fetched_ts=2.0)
+        assert cache.put(NODE, "/page/c.mu", "c" * 40, fetched_ts=3.0)
+        # 120 bytes > 100: the oldest row made room for c.
+        assert cache.total_bytes() <= 100
+        assert cache.get(NODE, "/page/a.mu") is None
+        assert cache.get(NODE, "/page/b.mu") is not None
+        assert cache.get(NODE, "/page/c.mu") is not None
+
+
+def test_total_stays_under_cap_across_many_puts(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        cache = PageCache(db, max_bytes=1000)
+        for i in range(50):
+            assert cache.put(NODE, f"/page/{i}.mu", "x" * 137, fetched_ts=float(i))
+            assert cache.total_bytes() <= 1000
+        assert cache.count() == 7  # 7 * 137 = 959, an 8th would be 1096
+        # newest are kept
+        assert cache.get(NODE, "/page/49.mu") is not None
+        assert cache.get(NODE, "/page/0.mu") is None
+
+
+def test_entry_larger_than_total_cap_is_refused(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        cache = PageCache(db, max_bytes=100)
+        assert cache.put(NODE, "/page/fits.mu", "x" * 100, fetched_ts=1.0)
+        assert cache.put(NODE, "/page/huge.mu", "y" * 101, fetched_ts=2.0) is False
+        assert cache.get(NODE, "/page/huge.mu") is None
+        # refusing must not evict the existing entry
+        assert cache.get(NODE, "/page/fits.mu") is not None
+        assert cache.total_bytes() == 100
+
+
+def test_unlimited_mode_still_works(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        cache = PageCache(db, max_bytes=0)
+        for i in range(20):
+            assert cache.put(NODE, f"/page/{i}.mu", "x" * 10_000, fetched_ts=float(i))
+        assert cache.count() == 20
+        assert cache.total_bytes() == 200_000
+        # per-entry cap is independent of the total cap
+        assert cache.put(NODE, "/page/big.mu", "x" * (MAX_CACHE_BYTES + 1)) is False
+
+
+def test_overwrite_existing_entry_does_not_double_count(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        cache = PageCache(db, max_bytes=100)
+        cache.put(NODE, "/page/a.mu", "a" * 60, fetched_ts=1.0)
+        cache.put(NODE, "/page/b.mu", "b" * 30, fetched_ts=2.0)
+        # refresh a (60 bytes) with 80 bytes: 80 + 30 = 110 > 100, so b is out
+        assert cache.put(NODE, "/page/a.mu", "a" * 80, fetched_ts=3.0)
+        assert cache.get(NODE, "/page/a.mu") is not None
+        assert cache.get(NODE, "/page/b.mu") is None
+        assert cache.total_bytes() == 80
+
+
+def test_set_max_bytes_shrinks_immediately(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        cache = PageCache(db, max_bytes=1000)
+        for i in range(5):
+            cache.put(NODE, f"/page/{i}.mu", "x" * 100, fetched_ts=float(i))
+        assert cache.total_bytes() == 500
+        removed = cache.set_max_bytes(250)
+        assert removed == 3
+        assert cache.total_bytes() <= 250
+        assert cache.get(NODE, "/page/4.mu") is not None
+
+
+def test_prune_honours_byte_cap(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        cache = PageCache(db, max_bytes=0)  # unlimited so puts all land
+        now = time.time()
+        for i in range(5):
+            cache.put(NODE, f"/page/{i}.mu", "x" * 100, fetched_ts=now + i)
+        assert cache.total_bytes() == 500
+        cache.prune(older_than_seconds=10_000, max_rows=500, max_bytes=200)
+        assert cache.total_bytes() <= 200
+        assert {r["path"] for r in cache.list()} == {"/page/3.mu", "/page/4.mu"}
+
+
+def test_clear_removes_every_row(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        cache = PageCache(db)
+        cache.put(NODE, "/page/a.mu", "a")
+        cache.put(NODE, "/page/b.mu", "b")
+        assert cache.clear() == 2
+        assert cache.count() == 0
+        assert cache.total_bytes() == 0
+        assert cache.clear() == 0
 
 
 def _service(tmp_path) -> CoreService:
