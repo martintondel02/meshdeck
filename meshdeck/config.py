@@ -36,6 +36,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # Phase 4: page hosting (nomadnetwork.node)
     "node_name": "",  # public name of the hosted node; empty = "<display>'s Node"
     "serve_pages": False,  # announce the node destination so others can find it
+    # Phase 4: store-and-forward hosting (LXMF propagation node). Live-applied.
+    "host_propagation_node": False,
 }
 
 DELIVERY_METHODS = ("direct", "propagated", "opportunistic")

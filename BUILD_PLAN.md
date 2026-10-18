@@ -769,6 +769,19 @@ kill-the-host integration test and a browser run of the cached/stale badges.
 **Phase 4 remaining:** `/media` handler (image conversion needs Pillow;
 deferred), executable pages (deliberately not supported).
 
+**P4.3 done (2026-10-18):** propagation-node hosting. `host_propagation_node`
+is live-applied via `LXMRouter.enable_propagation()`/`disable_propagation()`;
+status exposes the flag and the stable propagation address; advanced Settings
+has the toggle + copyable address, the guide covers costs/privacy. Verified
+live on a real daemon (enable/log/address stable/disable) plus an API test.
+End-to-end store-and-forward test is a separate commit.
+
+**P5.5 done (2026-10-18):** docs & first impressions — rewritten README with
+four real screenshots (two throwaway daemons, Playwright), CONTRIBUTING,
+SECURITY (private advisory reporting verified), docs/architecture.md, and the
+screenshot capture recipe. Fresh-clone ten-minute test not run; stated as
+unverified.
+
 **P5.4 done (2026-10-18):** accessibility pass — tablist nav, focus-trapped
 add-peer/onboarding dialogs, keyboard ⋯ menu, aria-labels, polite live
 regions, visible focus ring, reduced-motion support. Contrast verified

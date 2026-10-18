@@ -53,6 +53,8 @@ export const TOOLTIPS = {
     "Paste the address of any node that hosts pages (NomadNet node, Sideband, or another MeshDeck instance) — Open fetches its home page over an encrypted, resumable link.",
   shared_files:
     "Files hosted on your node and fetched on demand over an RNS link (NomadNet's /file scheme). Unlike chat attachments they don't ride inside messages — anyone with your node address can download them while your node is online.",
+  propagation_hosting:
+    "A propagation node stores and forwards LXMF messages for people who are offline. Hosting one makes your node infrastructure others can rely on — it uses disk for the message store and bandwidth when peers sync. Share the propagation address below, not your chat address.",
 } as const;
 
 export const GLOSSARY = {

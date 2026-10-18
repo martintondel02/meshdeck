@@ -41,6 +41,9 @@
   let deliveryBusy = $state(false);
   let deliveryNote = $state("");
   let propNode = $state("");
+  let hostBusy = $state(false);
+  let hostNote = $state("");
+  let propAddrCopied = $state(false);
 
   // seed local form state when settings load
   $effect(() => {
@@ -65,6 +68,34 @@
     } finally {
       deliveryBusy = false;
     }
+  }
+
+  async function togglePropagationHosting(e: Event) {
+    const value = (e.currentTarget as HTMLInputElement).checked;
+    hostBusy = true;
+    hostNote = "";
+    try {
+      const updated = await api<Record<string, unknown>>("/api/v1/settings", {
+        method: "PUT",
+        body: JSON.stringify({ host_propagation_node: value }),
+      });
+      settings.set(updated);
+      hostNote = value
+        ? "Hosting enabled — peers can now use the address below."
+        : "Hosting disabled.";
+    } catch {
+      hostNote = "Could not change propagation hosting.";
+    } finally {
+      hostBusy = false;
+    }
+  }
+
+  async function copyPropagationAddress() {
+    const hash = $status?.propagation_node_hash;
+    if (!hash) return;
+    await navigator.clipboard.writeText(hash);
+    propAddrCopied = true;
+    setTimeout(() => (propAddrCopied = false), 1500);
   }
 
   async function savePropagationNode() {
@@ -100,6 +131,7 @@
       </code>
       <button
         onclick={copyAddress}
+        aria-label="Copy your chat address"
         class="bg-wp-panel2 border border-wp-border rounded-lg px-3 py-2 text-sm hover:border-wp-accent transition-colors"
         >{copied ? "Copied!" : "Copy"}</button
       >
@@ -270,8 +302,61 @@
             >
           </div>
         </label>
-        {#if deliveryNote}<p class="text-xs text-wp-accent">{deliveryNote}</p>{/if}
+        {#if deliveryNote}
+          <p class="text-xs text-wp-accent" role="status" aria-live="polite">{deliveryNote}</p>
+        {/if}
       </div>
+    </section>
+  {/if}
+
+  {#if $mode === "advanced"}
+    <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
+      <h2 class="font-semibold mb-1">
+        Host for others (propagation node)
+        <Tooltip text={TOOLTIPS.propagation_hosting} />
+      </h2>
+      <p class="text-sm text-wp-dim mb-3">
+        Store-and-forward for LXMF: when a peer is offline, your node holds
+        their encrypted messages until they return. This is infrastructure
+        other people can rely on — it costs disk, bandwidth and uptime.
+      </p>
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          class="accent-wp-accent w-4 h-4"
+          checked={Boolean($settings.host_propagation_node)}
+          disabled={hostBusy}
+          onchange={togglePropagationHosting}
+        />
+        Host a propagation node
+      </label>
+      <div class="mt-3">
+        <p class="text-sm text-wp-dim mb-1">
+          Your propagation node address (share this — not your chat address):
+        </p>
+        <div class="flex items-center gap-2">
+          <code
+            class="flex-1 bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-xs font-mono truncate"
+          >
+            {$status?.propagation_node_hash || "…"}
+          </code>
+          <button
+            onclick={copyPropagationAddress}
+            class="bg-wp-panel2 border border-wp-border rounded-lg px-3 py-2 text-sm hover:border-wp-accent transition-colors"
+            aria-label="Copy propagation node address"
+            >{propAddrCopied ? "Copied!" : "Copy"}</button
+          >
+        </div>
+      </div>
+      {#if Boolean($settings.host_propagation_node)}
+        <p class="text-xs text-wp-warn mt-2">
+          Keep this machine online. Messages are stored encrypted, but their
+          timing and size are visible to you as the operator.
+        </p>
+      {/if}
+      {#if hostNote}
+        <p class="text-xs text-wp-accent mt-2" role="status" aria-live="polite">{hostNote}</p>
+      {/if}
     </section>
   {/if}
 

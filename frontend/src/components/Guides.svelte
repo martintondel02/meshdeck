@@ -46,6 +46,16 @@
       ],
     },
     {
+      title: "Hosting for others",
+      body: [
+        "A propagation node is a store-and-forward relay: senders hand it messages for people who are offline, and it holds them until the recipient reconnects and collects them. Hosting one turns your node into infrastructure other people rely on.",
+        "Advanced mode → Settings → Host for others, then switch the propagation-node toggle on. It takes effect immediately, no restart. The propagation node address shown right there is the one to share.",
+        "That address is not your chat address. Both are 32-character hashes made from the same identity, so they look almost identical — share the one labelled propagation node address. It is stable: turning hosting on or off, restarting, or changing networks never changes it.",
+        "What it costs you: disk for the message store (no size cap by default; uncollected messages expire after 30 days), bandwidth whenever a peer syncs, and simply keeping the machine online and reachable. Messages are encrypted to the recipient, so you store data you cannot read — but you can see which address a message is for, when it arrived, and how big it is. Only host on a machine you control.",
+        "Others use your node by pasting your propagation address into their Message delivery settings and choosing Propagated (or Opportunistic) delivery. Switching hosting off does not delete messages already stored — they stay on disk until you remove them yourself from lxmf/messagestore in the data directory.",
+      ],
+    },
+    {
       title: "Hosting pages",
       body: [
         "MeshDeck can host NomadNet-compatible pages right from your node — think a tiny encrypted web-site that needs no server, no DNS, and works over any transport Reticulum supports.",

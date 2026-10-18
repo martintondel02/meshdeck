@@ -77,6 +77,7 @@ class ChatRouter:
         display_name: str = "",
         delivery_method: str = "direct",
         propagation_node_hash: str = "",
+        host_propagation_node: bool = False,
     ) -> None:
         self._lxmf_dir = lxmf_dir
         self._files_dir = files_dir
@@ -85,6 +86,7 @@ class ChatRouter:
         self._display_name = display_name
         self._delivery_method = delivery_method if delivery_method in _METHODS else "direct"
         self._propagation_node_hash = propagation_node_hash
+        self._host_propagation_node = bool(host_propagation_node)
         self._router: LXMF.LXMRouter | None = None
         self._delivery_destination: RNS.Destination | None = None
         self._pending: dict[str, LXMF.LXMessage] = {}  # outbound, hash_hex -> lxm
@@ -104,6 +106,10 @@ class ChatRouter:
         router.register_delivery_callback(self._on_inbound)
         self._router = router
         self.apply_delivery_settings()
+        if self._host_propagation_node:
+            # Safe at runtime: LXMF registers the store-and-forward handlers
+            # and announces the propagation destination immediately.
+            self.set_propagation_hosting(True)
         log.info("LXMF router started; address=%s", self.delivery_destination_hash_hex)
 
     # -- identity / addressing ------------------------------------------------
@@ -144,6 +150,30 @@ class ChatRouter:
             "delivery_method": self._delivery_method,
             "propagation_node": outbound_node,
         }
+
+    @property
+    def propagation_hosting(self) -> bool:
+        return self._host_propagation_node
+
+    @property
+    def propagation_node_hash_hex(self) -> str:
+        """This node's own store-and-forward address (stable, hosting or not)."""
+        assert self._router is not None
+        return self._router.propagation_destination.hash.hex()
+
+    def set_propagation_hosting(self, enabled: bool) -> bool:
+        """Start/stop being a store-and-forward node for others (live)."""
+        assert self._router is not None
+        enabled = bool(enabled)
+        if enabled == self._host_propagation_node:
+            return enabled
+        if enabled:
+            self._router.enable_propagation()
+        else:
+            self._router.disable_propagation()
+        self._host_propagation_node = enabled
+        log.info("Propagation node hosting %s", "enabled" if enabled else "disabled")
+        return enabled
 
     def sync_from_propagation_node(self) -> bool:
         """Ask the configured propagation node for our stored messages."""

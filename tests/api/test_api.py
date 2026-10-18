@@ -71,6 +71,27 @@ async def test_api_endtoend(tmp_path):
             ) as r:
                 assert r.status == 400
 
+            # --- propagation-node hosting: live apply, no restart required
+            async with s.put(
+                f"{base}/api/v1/settings",
+                headers=auth,
+                json={"host_propagation_node": True},
+            ) as r:
+                assert r.status == 200
+                assert (await r.json())["host_propagation_node"] is True
+            async with s.get(f"{base}/api/v1/status", headers=auth) as r:
+                st = await r.json()
+                assert st["propagation_hosting"] is True
+                assert len(st["propagation_node_hash"]) == 32
+            async with s.put(
+                f"{base}/api/v1/settings",
+                headers=auth,
+                json={"host_propagation_node": False},
+            ) as r:
+                assert r.status == 200
+            async with s.get(f"{base}/api/v1/status", headers=auth) as r:
+                assert (await r.json())["propagation_hosting"] is False
+
             # --- manual peer add (no network: unknown identity -> path requested)
             async with s.post(
                 f"{base}/api/v1/peers", headers=auth, json={"hash": "zz11"}

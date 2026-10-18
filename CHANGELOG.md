@@ -4,6 +4,24 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added (Phase 4 — propagation hosting)
+
+- Advanced → Settings → **Host for others**: turn your MeshDeck node into an
+  LXMF propagation node (store-and-forward for offline peers) with a live
+  toggle (no restart), the node's stable propagation address with copy button,
+  and honest cost/privacy notes. `GET /api/v1/status` now exposes
+  `propagation_hosting` and `propagation_node_hash`.
+- `docs/guides/hosting-infrastructure.md` plus a built-in Guides section.
+
+### Added (Phase 5 — docs & first impressions)
+
+- Rewritten README with a basic/advanced feature table, quick start, honest
+  pre-release status, security/privacy notes, "what it is not", and four real
+  screenshots captured from two throwaway daemons.
+- `CONTRIBUTING.md`, `SECURITY.md` (private advisories), and
+  `docs/architecture.md` (threading/EventBus/restart/migrations).
+- `docs/screenshots/README.md` records the capture recipe and privacy rules.
+
 ### Added (Phase 5 — accessibility)
 
 - Keyboard and screen-reader pass: the top nav is a real tablist (arrow /

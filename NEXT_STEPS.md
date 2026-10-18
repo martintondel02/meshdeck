@@ -235,7 +235,21 @@ receipt = link.request(path, data={}, timeout=T, max_response_size=N,
   served from cache with `stale=True`; assert the content is byte-identical.
 - Cache must never store > 4 MiB per entry (same cap as pages).
 
-### P4.3 — Propagation-node hosting (advanced toggle)  ★ high value, small
+### P4.3 — Propagation-node hosting (advanced toggle)  ★ high value, small  ✅ DONE (live toggle verified; E2E store-and-forward test in a follow-up commit)
+
+> **Landed (2026-10-18):** `host_propagation_node` setting (default off,
+> live-applied — no restart); `ChatRouter.set_propagation_hosting()` calls
+> `LXMRouter.enable_propagation()`/`disable_propagation()` and exposes the
+> node's stable `propagation_node_hash`; `GET /status` reports both;
+> `PUT /settings` applies the toggle and publishes `settings_updated`.
+> Settings (advanced) has the toggle, cost/privacy explanation and the
+> propagation address with a copy button; `docs/guides/
+> hosting-infrastructure.md` + a Guides-tab section explain hosting.
+> **Verified:** real daemon PUT true → `propagation_hosting: true`, router log
+> “Propagation node hosting enabled”, address unchanged, PUT false → false;
+> API acceptance test added. The end-to-end “B → A → offline C syncs” test is
+> authored/verified separately (follow-up commit) so this commit does not
+> overclaim it.
 
 **Why:** "all-in-one" should include being infrastructure: a store-and-forward
 node others can use when peers are offline.
@@ -473,7 +487,21 @@ fallback works.
 **Acceptance:** a written checklist in the PR description with each item
 ticked by actually doing it; `pnpm run check` still 0 warnings.
 
-### P5.5 — Docs & first impressions
+### P5.5 — Docs & first impressions  ✅ DONE (fresh-clone ten-minute test not run)
+
+> **Landed (2026-10-18):** README rewritten (hero, honest pre-release status,
+> basic/advanced feature table, quick start, packaged-binary note,
+> architecture summary, security/privacy, "what it is not"); `CONTRIBUTING.md`,
+> `SECURITY.md` (private advisories verified enabled), and
+> `docs/architecture.md` (threading, EventBus, startup, `os.execv` restart,
+> migrations, where to add a feature). Four real screenshots captured from two
+> throwaway daemons with Playwright/Chromium at 1440×900 and embedded in the
+> README; capture/privacy rules in `docs/screenshots/README.md`.
+> Every documented command was checked against the Makefile/CLI; the
+> `meshdeck --version`/`--help` flags, caps and auth claims were verified
+> against the code. **Not verified:** a real stranger going from a fresh clone
+> to chatting in under ten minutes (no second human/timing run), and
+> screen-reader behaviour (see P5.4).
 
 **Tasks**
 1. README: hero paragraph, 3–4 screenshots (`docs/screenshots/`), feature

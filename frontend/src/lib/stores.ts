@@ -67,6 +67,8 @@ export interface Status {
   interfaces: { name: string; type: string; online: boolean; bitrate: number | null }[];
   peers: number;
   uptime_seconds: number;
+  propagation_hosting: boolean;
+  propagation_node_hash: string;
 }
 
 export const identity = writable<IdentityInfo | null>(null);
