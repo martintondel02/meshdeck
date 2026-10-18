@@ -101,6 +101,7 @@ class ApiServer:
         app.router.add_get("/api/v1/settings", self._get_settings)
         app.router.add_put("/api/v1/settings", self._put_settings)
         app.router.add_post("/api/v1/announce", self._announce)
+        app.router.add_post("/api/v1/restart", self._restart)
         app.router.add_get("/ws", self._websocket)
         app.router.add_get("/", self._index)
         app.router.add_get("/{tail:.*}", self._static_or_index)
@@ -194,6 +195,23 @@ class ApiServer:
 
     async def _announce(self, request: web.Request) -> web.Response:
         return _json(await self.service.announce_now())
+
+    async def _restart(self, request: web.Request) -> web.Response:
+        """Pre-validate the current config, then schedule a process restart.
+
+        Waypoint restarts by process re-exec (supervised by the CLI), because
+        this rns version's Reticulum singleton cannot be re-created in-process."""
+        try:
+            return _json(self.service.request_restart(), status=202)
+        except ValueError as exc:
+            msg = str(exc)
+            if msg.startswith("invalid_config:"):
+                problems = msg[len("invalid_config:"):].split("|")
+                return _json(
+                    {"error": {"code": "invalid_config", "problems": problems}},
+                    status=400,
+                )
+            raise
 
     async def _send_file(self, request: web.Request) -> web.Response:
         """Multipart upload: fields 'peer' (hash), 'file' (the payload),

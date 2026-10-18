@@ -32,8 +32,9 @@ from waypoint.config import (
     SettingsStore,
 )
 from waypoint.core.events import Event, EventBus
+from waypoint.rns.config_gen import render_config, validate_interfaces
 from waypoint.rns.identity import IdentityManager
-from waypoint.rns.stack import RnsStack
+from waypoint.rns.stack import InvalidConfigError, RnsStack, validate_interface_config
 from waypoint.storage import messages as msg_repo
 from waypoint.storage import peers as peer_repo
 from waypoint.storage.db import Database
@@ -41,10 +42,13 @@ from waypoint.util.hexid import is_valid_hash_hex, is_valid_msg_hash_hex
 
 log = logging.getLogger(__name__)
 
-# Settings that require an RNS restart to take effect (live reconfigure = Phase 4).
+# Settings that require an RNS restart to take effect. Waypoint restarts the
+# whole process (os.execv) because RNS.Reticulum is a never-cleared singleton
+# in this rns version — an in-process re-instance raises OSError.
 RESTART_SETTINGS = {
     "connect_autointerface",
     "public_entrypoints",
+    "interfaces",
     "extra_config_text",
     "transport_enabled",
     "log_level",
@@ -69,6 +73,10 @@ class CoreService:
         self._poll_task: asyncio.Task | None = None
         self._started_ts = 0.0
         self._db_lock = asyncio.Lock()
+        # Set by the API; supervised by the CLI, which re-execs the process
+        # (RNS can't be restarted in-process: Reticulum.__instance is never
+        # cleared in this rns version).
+        self.restart_requested: asyncio.Event | None = None
 
     # -- lifecycle ------------------------------------------------------------
 
@@ -81,6 +89,7 @@ class CoreService:
         self.bus.bind(asyncio.get_running_loop())
         await self.bus.start()
         self.bus.subscribe(self._persist_event)
+        self.restart_requested = asyncio.Event()
 
         self.identity = IdentityManager(self.paths.identity_path)
         await asyncio.to_thread(self.identity.load_or_create)
@@ -283,12 +292,20 @@ class CoreService:
         )
         return {"hash": msg_hash, "state": msg_repo.SENDING, "peer": peer_hash}
 
+    def _peer_stamp_cost(self, peer_hash: str) -> int | None:
+        peer = peer_repo.get_peer(self.db, peer_hash)
+        if peer and isinstance(peer.get("stamp_cost"), int) and peer["stamp_cost"] > 0:
+            return int(peer["stamp_cost"])
+        return None
+
     def send_message(self, peer_hash: str, content: str, title: str = "") -> dict[str, Any]:
         """Raises ValueError with a machine-readable code on failure."""
         if not is_valid_hash_hex(peer_hash):
             raise ValueError("invalid_hash")
         try:
-            msg_hash = self.chat.send(peer_hash, content, title)
+            msg_hash = self.chat.send(
+                peer_hash, content, title, stamp_cost=self._peer_stamp_cost(peer_hash)
+            )
         except PeerUnknownError:
             raise ValueError("no_path") from None
         except MessageTooLargeError:
@@ -305,7 +322,10 @@ class CoreService:
             raise ValueError("invalid_hash")
         try:
             msg_hash = self.chat.send(
-                peer_hash, caption, attachments=[(filename, data)]
+                peer_hash,
+                caption,
+                attachments=[(filename, data)],
+                stamp_cost=self._peer_stamp_cost(peer_hash),
             )
         except PeerUnknownError:
             raise ValueError("no_path") from None
@@ -377,6 +397,13 @@ class CoreService:
                 raise ValueError("invalid_delivery_method")
             if key == "propagation_node_hash" and value and not is_valid_hash_hex(value):
                 raise ValueError("invalid_propagation_node")
+            if key == "interfaces":
+                if not isinstance(value, list):
+                    raise ValueError("invalid_interfaces")
+                problems = validate_interfaces([e for e in value if isinstance(e, dict)])
+                if problems or not all(isinstance(e, dict) for e in value):
+                    details = "; ".join(problems or ["entries must be objects"])
+                    raise ValueError("invalid_interfaces: " + details)
             if key in RESTART_SETTINGS and self.settings.get(key) != value:
                 restart_required = True
             self.settings.set(key, value)
@@ -393,3 +420,31 @@ class CoreService:
     async def announce_now(self) -> dict[str, Any]:
         await asyncio.to_thread(self.chat.announce)
         return {"announced": True, "ts": time.time()}
+
+    # -- restart (network reconfigure) ------------------------------------------
+
+    def validate_network_config(self) -> list[str]:
+        """Render the config for CURRENT settings and pre-flight it.
+
+        Returns a list of human-readable problems (empty = bootable)."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory(prefix="wp-cfgcheck-") as tmp:
+            cfg = Path(tmp) / "config"
+            cfg.write_text(render_config(self.settings.all(), log_file="x"), encoding="utf-8")
+            try:
+                validate_interface_config(cfg)
+            except InvalidConfigError as exc:
+                return [str(exc)]
+        return []
+
+    def request_restart(self) -> dict[str, Any]:
+        """Ask the supervising CLI to re-exec the process with fresh settings."""
+        problems = self.validate_network_config()
+        if problems:
+            raise ValueError("invalid_config:" + "|".join(problems))
+        assert self.restart_requested is not None
+        self.bus.publish("restart_scheduled", {})
+        # Defer the flip slightly so the HTTP response can complete first.
+        asyncio.get_running_loop().call_later(0.4, self.restart_requested.set)
+        return {"restarting": True}

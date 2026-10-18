@@ -177,8 +177,14 @@ class ChatRouter:
         title: str = "",
         attachments: list[tuple[str, bytes]] | None = None,
         method: str | None = None,
+        stamp_cost: int | None = None,
     ) -> str:
-        """Queue an LXMF message. Returns the message hash (hex)."""
+        """Queue an LXMF message. Returns the message hash (hex).
+
+        When ``stamp_cost`` is set (announced by the recipient), LXMF defers
+        the outbound, generates the proof-of-work stamp in a worker pool, and
+        then sends — the message hash stays stable through the re-pack because
+        stamps are not part of the hashed payload."""
         assert self._router is not None and self._delivery_destination is not None
         if len(content.encode("utf-8")) > MAX_CONTENT_BYTES:
             raise MessageTooLargeError(f"message exceeds {MAX_CONTENT_BYTES} bytes")
@@ -224,6 +230,10 @@ class ChatRouter:
             title,
             fields=fields,
             desired_method=desired,
+            stamp_cost=stamp_cost,
+            # attach a reply ticket so the receiver can answer without
+            # generating their own stamp for this conversation
+            include_ticket=True,
         )
         lxm.register_delivery_callback(self._on_outbound_delivered)
         lxm.register_failed_callback(self._on_outbound_failed)

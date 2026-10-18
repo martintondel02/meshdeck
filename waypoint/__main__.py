@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
+import sys
 import webbrowser
 from pathlib import Path
 
@@ -41,6 +43,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def resolve_static_dir() -> Path | None:
+    # PyInstaller bundle: datas are unpacked under sys._MEIPASS (or _internal
+    # in 6.x onedir mode); the frozen app also looks for a sibling dist dir.
+    for candidate in (
+        getattr(sys, "_MEIPASS", None) and Path(sys._MEIPASS) / "frontend" / "dist",
+        getattr(sys, "_MEIPASS", None) and Path(sys._MEIPASS).parent / "frontend" / "dist",
+    ):
+        if candidate and candidate.exists():
+            return candidate
     # Repo layout: <repo>/waypoint/__main__.py -> <repo>/frontend/dist
     repo_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     if repo_dist.exists():
@@ -72,9 +82,25 @@ async def amain(args: argparse.Namespace) -> int:
     if args.open_browser:
         webbrowser.open(url)
 
+    async def restart_watch() -> None:
+        """Network config changes are applied by re-executing the process;
+        this rns version cannot re-create its Reticulum singleton in-process."""
+        assert service.restart_requested is not None
+        await service.restart_requested.wait()
+        log.info("restart requested — stopping and re-executing process")
+        await server.stop()
+        await service.stop()
+        argv = [sys.executable, "-m", "waypoint", "--data-dir", str(paths.data_dir),
+                "--host", args.host, "--port", str(port)]
+        if args.verbose:
+            argv.append("-v")
+        os.execv(sys.executable, argv)
+
+    watcher = asyncio.create_task(restart_watch())
     try:
         await asyncio.Event().wait()  # run until cancelled
     finally:
+        watcher.cancel()
         await server.stop()
         await service.stop()
     return 0

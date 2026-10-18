@@ -13,6 +13,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -76,6 +77,24 @@ async def run(args: argparse.Namespace) -> int:
 
     service.bus.subscribe(on_event)
     await service.start()
+
+    if args.restart_watch_file:
+        watch_path = Path(args.restart_watch_file)
+        boot_mtime = watch_path.stat().st_mtime if watch_path.exists() else 0.0
+
+        async def restart_watcher() -> None:
+            """Mirrors the CLI's os.execv restart; triggered by file touch."""
+            while True:
+                if (
+                    watch_path.exists()
+                    and watch_path.stat().st_mtime > boot_mtime
+                ):
+                    jlog(event="restart_triggered")
+                    await service.stop()
+                    os.execv(sys.executable, [sys.executable, *sys.argv])
+                await asyncio.sleep(0.4)
+
+        asyncio.create_task(restart_watcher())
 
     info = service.identity_info()
     Path(args.ready_file).write_text(json.dumps(info), encoding="utf-8")
@@ -147,6 +166,8 @@ def main() -> int:
     parser.add_argument("--expect-from", default=None)
     parser.add_argument("--reply", default=None,
                         help="reply with this text when the expect condition matches")
+    parser.add_argument("--restart-watch-file", default=None,
+                        help="when this file is touched after boot, re-exec the process")
     parser.add_argument("--ready-file", required=True)
     parser.add_argument("--done-file", required=True)
     parser.add_argument("--timeout", type=int, default=120)

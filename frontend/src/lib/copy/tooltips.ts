@@ -35,6 +35,16 @@ export const TOOLTIPS = {
     "The hash of an LXMF propagation node that stores messages for offline peers. Ask the node's operator how to reach it, then paste its hash here.",
   attachments:
     "Files ride inside the LXMF message itself — encrypted and signed like chat text. Large files take a while; the message shows delivery status just like chat.",
+  hosting_entrypoint:
+    "Serving on 0.0.0.0 accepts connections from anywhere the machine is reachable. You must forward/open the port in your firewall or router. Public interfaces get announce-rate limits automatically (see the Reticulum manual).",
+  gateway_mode:
+    "Gateway interfaces greatly improve convergence for clients connecting through them — recommended for public entrypoints.",
+  share_entrypoint:
+    "Give friends this snippet so they can add your node as a client interface (or via Paste config snippet).",
+  transport_node_setting:
+    "A transport node forwards traffic for others, strengthening the mesh. Only enable on machines that stay online and are well connected.",
+  stamp_sending:
+    "This peer requires anti-spam proof-of-work (a stamp). Your message is generated automatically — the checkmark just takes a few extra seconds.",
 } as const;
 
 export const GLOSSARY = {

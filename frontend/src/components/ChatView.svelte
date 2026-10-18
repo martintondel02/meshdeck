@@ -24,9 +24,20 @@
   let scrollBox: HTMLDivElement | undefined = $state();
   let fileInput: HTMLInputElement | undefined = $state();
   let fileSending = $state(false);
+  let search = $state("");
 
   const peer = $derived($peers.find((p) => p.hash === $activePeer) ?? null);
-  const msgs = $derived($activePeer ? ($messages[$activePeer] ?? []) : []);
+  const allMsgs = $derived($activePeer ? ($messages[$activePeer] ?? []) : []);
+  const query = $derived(search.trim().toLowerCase());
+  const msgs = $derived(
+    query
+      ? allMsgs.filter(
+          (m) =>
+            (m.content ?? "").toLowerCase().includes(query) ||
+            (m.title ?? "").toLowerCase().includes(query),
+        )
+      : allMsgs,
+  );
 
   $effect(() => {
     if ($activePeer) void loadHistory($activePeer);
@@ -180,6 +191,24 @@
       <span class="font-semibold">{peerLabel(peer)}</span>
       <span class="text-xs text-wp-dim font-mono">{peer.hash}</span>
       <Tooltip text={TOOLTIPS.peer_hash} />
+      {#if peer.stamp_cost}
+        <span
+          class="ml-2 text-[10px] uppercase tracking-wide bg-wp-warn/15 text-wp-warn
+                 border border-wp-warn/40 rounded-full px-2 py-0.5"
+          >stamp {peer.stamp_cost}</span
+        >
+        <Tooltip text={TOOLTIPS.stamp_sending} />
+      {/if}
+      <div class="flex-1"></div>
+      <input
+        bind:value={search}
+        placeholder="Search history…"
+        class="w-44 bg-wp-bg border border-wp-border rounded-lg px-3 py-1 text-xs
+               focus:outline-none focus:border-wp-accent"
+      />
+      {#if query}
+        <span class="text-[11px] text-wp-dim">{msgs.length} match{msgs.length === 1 ? "" : "es"}</span>
+      {/if}
     </div>
 
     <div bind:this={scrollBox} class="flex-1 overflow-y-auto px-5 py-4 space-y-3">

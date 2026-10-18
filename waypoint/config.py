@@ -20,6 +20,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "display_name": "",
     "connect_autointerface": True,
     "public_entrypoints": [],  # [{"name": str, "host": str, "port": int}, ...]
+    # Structured interface list (Phase 3 wizard); when non-empty it fully
+    # replaces the auto/entrypoints defaults. Entry schema:
+    # {kind: auto|tcp_server|tcp_client|backbone_server|backbone_client,
+    #  name, enabled, listen_ip?, port?, target_host?, target_port?,
+    #  gateway_mode?}
+    "interfaces": [],
     "extra_config_text": "",  # advanced escape hatch, appended raw to reticulum config
     "announce_interval_minutes": 15,
     "log_level": 4,

@@ -631,11 +631,29 @@ phase; Playwright optional from Phase 5.
     (`RnsStack.validate_interface_config`) before constructing RNS.
 14. **Interface key names (rns 1.5.7)**: `TCPServerInterface`/
     `BackboneInterface` take **`listen_ip`** + `port` (or `listen_port`);
-    the older docs spelling `listen_on` is NOT accepted by
-    `TCPServerInterface` — it panics. Clients take `target_host`/`target_port`.
+    the older docs spelling `listen_on` is auto-remapped — **only for the
+    Backbone types** (`Reticulum.py:1119-1122`); TCPServer silently lacks the
+    alias and RNS panics (see #13). Emit canonical keys per type.
 15. **`LXMessage.hash` is `None` until `pack()`** — call `lxm.pack()`
     yourself right after construction (guarded, deterministic) before
     `handle_outbound`, or you cannot track outbound state.
+16. **`RNS.Reticulum` is a never-cleared process singleton**
+    (`Reticulum.__instance` has no reset in 1.5.7) → runtime reconfiguration
+    must re-exec the process (`os.execv` under the CLI supervisor after
+    persisting settings to sqlite). `POST /api/v1/restart` implements this.
+17. **PyInstaller + RNS**: `from RNS.Interfaces import *` (in
+    `RNS.Reticulum`) discovers submodule names by enumerating the package
+    DIRECTORY, which vanishes inside a frozen binary → `NameError:
+    BackboneInterface is not defined` at boot. Fix in the packaging shim:
+    import every `RNS.Interfaces.*` module (hiddenimports) and bind them as
+    attributes on the REAL `RNS.Reticulum` module — via
+    `importlib.import_module("RNS.Reticulum")`, because `RNS.Reticulum`
+    attribute access yields the re-exported **class**, not the module.
+18. **Stamp handling is free**: `LXMessage(stamp_cost=N)` with default
+    `defer_stamp=True` is parked in `pending_deferred_stamps`; LXMF's job
+    loop mines the PoW in a worker pool and re-packs (hash unchanged — the
+    stamp is outside the hashed payload). Pass the peer's announced
+    stamp_cost; `include_ticket=True` lets them reply free.
 
 ---
 
@@ -674,10 +692,37 @@ equality on the receiver side; oversize uploads return `too_large` (400).
 - [x] 20. Delivery settings: method + propagation node, live-applied
 - [x] 21. In-app Guides view + repo guide docs
 
-**Phase 3 (next):** interface wizard + entrypoint list editor, hosted
-interface wizards, stamp-cost handling (auto PoW for propagated sends),
-LXMF image/audio previews (`FIELD_IMAGE`/`FIELD_AUDIO`), history search UI,
-packaging (PyInstaller one-file binary + Flatpak manifest start).
+**Phase 3 — connectivity & hosting wizards, stamps, packaging — DONE 2026-10-18.**
+Verified with a wizard-only E2E: two daemons, zero hand-written configs —
+PUT interfaces → POST /restart (process re-exec) → announce discovery →
+chat delivery across the wizard-built link; restart integration test proves
+the new interface is live after re-exec.
+
+- [x] 22. Structured `interfaces` settings list + INI renderer (rate-limit
+      presets for public listeners; gateway mode for backbone)
+- [x] 23. `POST /api/v1/restart`: pre-validates config, re-execs via CLI
+      supervisor (RNS singleton never clears — pitfall §14.16)
+- [x] 24. Interfaces wizard UI: add/remove/toggle, paste-snippet parser
+      (directory.rns.recipes / rmap.world compatible), hosting wizards with
+      share-snippet generator + firewall explainer
+- [x] 25. Transport-node toggle (advanced) with stewardship warning
+- [x] 26. Stamp-cost sending: `LXMessage(stamp_cost=…, include_ticket=True)`
+      defers PoW to LXMF's worker pool; hash stays stable (stamp ∉ hashed
+      payload); UI stamp badge + hint
+- [x] 27. Chat history search (client filter) + match counter
+- [x] 28. PyInstaller packaging: `make package` → one-file binary with the UI
+      embedded (frontend/dist as data files)
+
+**Phase 4 (next):** Reticulum page/site hosting (NomadNet-compatible `.mu`
+pages served from Waypoint; "publish a page" wizard; discover/browse pages of
+peers), LXMF page delivery, resource-progress UI for large transfers.
+
+**Phase 5 (after):** i18n scaffolding, packaged releases (Flatpak/AppImage/
+Windows exe from the PyInstaller base), accessibility pass, first public tag.
+
+---
+
+## 13. RNS/LXMF integration recipe (the critical path)
 
 ---
 

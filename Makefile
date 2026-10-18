@@ -2,7 +2,7 @@ VENV := .venv
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 
-.PHONY: install install-frontend test test-integration lint check build-frontend run dev clean
+.PHONY: install install-frontend test test-integration lint check build-frontend run dev package clean
 
 install: ## create venv + install backend with dev deps
 	python3 -m venv $(VENV)
@@ -32,6 +32,12 @@ run: ## start the daemon + web UI (dev)
 
 dev: build-frontend run ## build UI then start
 
+package: build-frontend ## one-file binary with embedded UI (PyInstaller)
+	$(PIP) install --quiet pyinstaller
+	$(VENV)/bin/pyinstaller packaging/waypoint.spec --distpath dist --workpath build --noconfirm
+	@echo ""
+	@echo "Binary: dist/waypoint   (serve it, run: ./dist/waypoint)"
+
 clean:
-	rm -rf frontend/node_modules frontend/dist .pytest_cache .ruff_cache
+	rm -rf frontend/node_modules frontend/dist .pytest_cache .ruff_cache build dist waypoint.spec.bak
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

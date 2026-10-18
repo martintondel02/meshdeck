@@ -3,6 +3,7 @@
   import { identity, mode, settings, status } from "../lib/stores";
   import { wsCmd } from "../lib/ws";
   import Tooltip from "./Tooltip.svelte";
+  import InterfacesCard from "./InterfacesCard.svelte";
   import { GLOSSARY, TOOLTIPS } from "../lib/copy/tooltips";
 
   let announceBusy = $state(false);
@@ -146,6 +147,16 @@
     </button>
     <Tooltip text={TOOLTIPS.announce} />
 
+    {#if $mode === "basic"}
+      <p class="text-xs text-wp-dim mt-3">
+        To reach beyond your local network, enable advanced mode and use the
+        interfaces wizard — or ask a friend for their connection snippet.
+        Community directories:
+        <a class="text-wp-accent hover:underline" href="https://directory.rns.recipes/" target="_blank" rel="noreferrer">directory.rns.recipes</a>,
+        <a class="text-wp-accent hover:underline" href="https://rmap.world/" target="_blank" rel="noreferrer">rmap.world</a>.
+      </p>
+    {/if}
+
     {#if $mode === "advanced" && $status}
       <div class="mt-4 border-t border-wp-border pt-4">
         <h3 class="text-sm font-semibold mb-2 text-wp-dim uppercase tracking-wide">Interfaces</h3>
@@ -178,6 +189,45 @@
       </div>
     {/if}
   </section>
+
+  {#if $mode === "advanced"}
+    <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
+      <h2 class="font-semibold mb-1">
+        Interfaces
+        <Tooltip text={TOOLTIPS.hosting_entrypoint} />
+      </h2>
+      <InterfacesCard />
+    </section>
+
+    <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
+      <h2 class="font-semibold mb-1">
+        Transport node
+        <Tooltip text={TOOLTIPS.transport_node_setting} />
+      </h2>
+      <label class="flex items-center gap-2 mt-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          class="accent-wp-accent w-4 h-4"
+          checked={Boolean($settings.transport_enabled)}
+          onchange={async (e) => {
+            const value = (e.currentTarget as HTMLInputElement).checked;
+            const updated = await api<Record<string, unknown>>("/api/v1/settings", {
+              method: "PUT",
+              body: JSON.stringify({ transport_enabled: value }),
+            });
+            settings.set(updated);
+            restartNote = true;
+          }}
+        />
+        Carry traffic for other nodes (enable_transport)
+      </label>
+      {#if Boolean($settings.transport_enabled)}
+        <p class="text-xs text-wp-warn mt-2">
+          Transport nodes serve the mesh; run one on stable, well-connected machines only.
+        </p>
+      {/if}
+    </section>
+  {/if}
 
   {#if $mode === "advanced"}
     <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">

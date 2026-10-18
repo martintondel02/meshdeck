@@ -64,13 +64,18 @@ make install-frontend   # frontend deps (pnpm)
 make dev                # build UI + start daemon  → prints the UI URL (with token)
 
 make test               # unit tests
-make test-integration   # two real nodes exchanging an LXMF message
+make test-integration   # real-node tests: chat, files, restarts
 make lint               # ruff + svelte-check
+make package            # one-file binary with embedded UI (dist/waypoint)
 ```
 
+Want just the runnable thing? `make package`, then run `./dist/waypoint` —
+no Python install needed.
+
 `python -m waypoint --data-dir /tmp/x --port 8570` runs an isolated instance —
-handy for local two-instance chats. Current status: **Phase 1 (chat MVP)
-done and verified**; see [BUILD_PLAN.md §12/§15](BUILD_PLAN.md).
+handy for local two-instance chats. Current status: **Phase 3 done**
+(chat, files, contacts, interfaces + hosting wizards, stamps, packaging);
+see [BUILD_PLAN.md §12/§15](BUILD_PLAN.md).
 
 ## License
 
