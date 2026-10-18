@@ -27,6 +27,10 @@ MAX_CONTENT_BYTES = 64 * 1024
 MAX_ATTACHMENT_TOTAL_BYTES = 1536 * 1024  # 1.5 MiB
 ROUTER_DELIVERY_LIMIT_KB = 2048  # inbound direct-transfer cap: 2,048,000 bytes
 
+# Default LXMF propagation message-store cap, in MB (LXMF's own unit: the
+# setter multiplies megabytes by 1,000,000). 0 would mean "unlimited".
+DEFAULT_PROPAGATION_STORAGE_LIMIT_MB = 256
+
 _METHODS = {
     "direct": LXMF.LXMessage.DIRECT,
     "propagated": LXMF.LXMessage.PROPAGATED,
@@ -78,6 +82,7 @@ class ChatRouter:
         delivery_method: str = "direct",
         propagation_node_hash: str = "",
         host_propagation_node: bool = False,
+        propagation_storage_limit_mb: int = DEFAULT_PROPAGATION_STORAGE_LIMIT_MB,
     ) -> None:
         self._lxmf_dir = lxmf_dir
         self._files_dir = files_dir
@@ -87,6 +92,7 @@ class ChatRouter:
         self._delivery_method = delivery_method if delivery_method in _METHODS else "direct"
         self._propagation_node_hash = propagation_node_hash
         self._host_propagation_node = bool(host_propagation_node)
+        self._propagation_storage_limit_mb = max(0, int(propagation_storage_limit_mb))
         self._router: LXMF.LXMRouter | None = None
         self._delivery_destination: RNS.Destination | None = None
         self._pending: dict[str, LXMF.LXMessage] = {}  # outbound, hash_hex -> lxm
@@ -106,6 +112,9 @@ class ChatRouter:
         router.register_delivery_callback(self._on_inbound)
         self._router = router
         self.apply_delivery_settings()
+        # Install the disk cap before hosting starts, so LXMF's own store log
+        # and its first clean_message_store() pass already use it.
+        self.set_propagation_storage_limit_mb(self._propagation_storage_limit_mb)
         # Apply the persisted hosting preference after the router exists. The
         # flag is already True here, so reset it first: the setter's equality
         # guard would otherwise skip enable_propagation() (no message store,
@@ -172,12 +181,73 @@ class ChatRouter:
         if enabled == self._host_propagation_node:
             return enabled
         if enabled:
+            # Re-apply on every enable: LXMF keeps the limit on the router and
+            # only enforces it while hosting, so a stale value must not linger.
+            self.set_propagation_storage_limit_mb(self._propagation_storage_limit_mb)
             self._router.enable_propagation()
         else:
             self._router.disable_propagation()
         self._host_propagation_node = enabled
         log.info("Propagation node hosting %s", "enabled" if enabled else "disabled")
         return enabled
+
+    # -- propagation message store (disk usage) -------------------------------
+
+    def set_propagation_storage_limit_mb(self, megabytes: int) -> int:
+        """Cap LXMF's message store on disk. ``0`` means unlimited.
+
+        Uses the official ``LXMRouter.set_message_storage_limit(megabytes=…)``
+        API for a real limit. LXMF 1.2.1's setter cannot express "unlimited"
+        (``megabytes=0`` ends in ``int(None)`` and raises ``ValueError``), so
+        unlimited is applied by setting the same public attribute the setter
+        writes — exactly what ``LXMRouter.__init__`` does for its default.
+
+        LXMF applies the cap itself: ``jobs()`` calls ``clean_message_store()``
+        every JOB_STORE_INTERVAL (120) ticks, and only while propagation
+        hosting is enabled. Nothing is faked here; the limit therefore takes
+        effect within ~2 minutes, not instantly.
+        """
+        assert self._router is not None
+        megabytes = max(0, int(megabytes))
+        if megabytes == 0:
+            self._router.message_storage_limit = None
+        else:
+            self._router.set_message_storage_limit(megabytes=megabytes)
+        self._propagation_storage_limit_mb = megabytes
+        log.info(
+            "Propagation message storage limit set to %s",
+            "unlimited" if megabytes == 0 else f"{megabytes} MB",
+        )
+        return megabytes
+
+    @property
+    def propagation_storage_limit_mb(self) -> int:
+        """The configured cap (0 = unlimited), regardless of LXMF's state."""
+        return self._propagation_storage_limit_mb
+
+    @property
+    def propagation_storage_limit_bytes(self) -> int:
+        """The byte limit LXMF is actually holding (0 = unlimited)."""
+        if self._router is None:
+            return 0
+        return int(getattr(self._router, "message_storage_limit", None) or 0)
+
+    @property
+    def propagation_store_bytes(self) -> int | None:
+        """Bytes currently in LXMF's message store.
+
+        ``None`` when not hosting (LXMF reports no store then) or when the
+        size cannot be read safely; callers should show "—" rather than 0."""
+        if self._router is None or not self._host_propagation_node:
+            return None
+        try:
+            size = self._router.message_storage_size()
+        except Exception:  # noqa: BLE001 - a stats read must never break /status
+            # LXMF sums over a dict its own job thread can mutate; a torn read
+            # raises RuntimeError and the next poll will succeed.
+            log.debug("could not read LXMF message store size", exc_info=True)
+            return None
+        return None if size is None else int(size)
 
     def sync_from_propagation_node(self) -> bool:
         """Ask the configured propagation node for our stored messages."""

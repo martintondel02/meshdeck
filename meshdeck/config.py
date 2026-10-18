@@ -38,11 +38,35 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "serve_pages": False,  # announce the node destination so others can find it
     # Phase 4: store-and-forward hosting (LXMF propagation node). Live-applied.
     "host_propagation_node": False,
+    # Phase 6.3: bound disk usage. Both limits are live-applied; 0 = unlimited.
+    # Page cache: total bytes for the whole offline page cache. 64 MiB default
+    # (the old 500 rows x 4 MiB ceiling was ~2 GB of worst case).
+    "page_cache_max_bytes": 64 * 1024 * 1024,
+    # LXMF propagation message store, in MB as LXMF itself counts them
+    # (decimal: 1 MB = 1,000,000 bytes, matching RNS.prettysize output).
+    "propagation_storage_limit_mb": 256,
 }
 
 DELIVERY_METHODS = ("direct", "propagated", "opportunistic")
 
 VALID_MODES = ("basic", "advanced")
+
+# Numeric setting bounds. Anything outside is rejected with 400 by the API,
+# never silently clamped, so the UI can always trust the stored value.
+PAGE_CACHE_MAX_BYTES_CEILING = 1024 * 1024 * 1024  # 1 GiB
+PROPAGATION_STORAGE_LIMIT_MB_MAX = 10240  # 10 GiB, the UI's documented range
+
+
+def coerce_setting_int(key: str, value: Any, minimum: int, maximum: int) -> int:
+    """Validate a numeric setting from JSON and return it as a plain int.
+
+    Strict on purpose: booleans are ints in Python, and floats/strings would
+    otherwise be stored and then applied differently at the next boot."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"invalid_{key}")
+    if value < minimum or value > maximum:
+        raise ValueError(f"invalid_{key}")
+    return value
 
 
 def default_data_dir() -> Path:
