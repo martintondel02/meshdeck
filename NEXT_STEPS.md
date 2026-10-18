@@ -32,7 +32,7 @@ Environment facts:
 | Frontend | Vite + Svelte 5 (runes) + TS + Tailwind 4, pnpm |
 | Run | `.venv/bin/python -m meshdeck --data-dir /tmp/x --port 8570` (prints UI URL with `?token=`) |
 | Default API | `127.0.0.1:8570`, bearer token in `<data-dir>/token` |
-| DB | SQLite `<data-dir>/meshdeck.db`, raw SQL, `PRAGMA user_version` migrations (currently **v2**) |
+| DB | SQLite `<data-dir>/meshdeck.db`, raw SQL, `PRAGMA user_version` migrations (currently **v3**: + `page_cache`) |
 | GitHub | `martintondel02/meshdeck`, `gh` CLI authenticated with `repo` scope |
 | Push policy | commit per task with a descriptive message, then `git push origin main` |
 
@@ -188,7 +188,22 @@ receipt = link.request(path, data={}, timeout=T, max_response_size=N,
 - A `progress_callback` raising will abort the transfer: wrap user code in
   `try/except Exception: log`.
 
-### P4.2 — Page cache (offline browsing of visited pages)  ★ medium
+### P4.2 — Page cache (offline browsing of visited pages)  ★ medium  ✅ DONE
+
+> **Landed (2026-10-18):** DB migration v3 + `storage/page_cache.py`
+> (`put/get/list/prune`, 4 MiB per-entry cap, ≤500 rows, 30-day age prune at
+> boot). `browse_page(..., refresh=False, max_age=3600)` serves fresh hits
+> with `elapsed_ms=0`, caches successful fetches, and on
+> `no_path`/`link_timeout` returns a stale entry with
+> `served_from_cache=True, stale=True, error=<code>`; `?refresh=1` forces a
+> fetch. Reader shows “cached · 2h ago” / “saved copy — node unreachable”
+> plus an always-available Refresh button.
+> Verified: 7 new unit tests (repo + fresh/stale/refresh/no-cache service
+> paths) and an integration test that fetches live, kills node A, refetches
+> with `max_age=0`, and gets byte-identical content with `stale=True`
+> (19.4 s, dominated by the 15 s link timeout). Browser E2E: live fetch had
+> no badge; after killing the host, Refresh showed the saved-copy badge and
+> the same page.
 
 **Why:** NomadNet caches pages; revisiting a node offline currently errors.
 

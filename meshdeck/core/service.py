@@ -44,6 +44,7 @@ from meshdeck.storage import messages as msg_repo
 from meshdeck.storage import nodes as node_repo
 from meshdeck.storage import peers as peer_repo
 from meshdeck.storage.db import Database
+from meshdeck.storage.page_cache import PageCache
 from meshdeck.util.hexid import is_valid_hash_hex, is_valid_msg_hash_hex
 
 log = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class CoreService:
         self.chat: ChatRouter | None = None
         self.announce_handler: LxmfPeerAnnounceHandler | None = None
         self.pages: PageHost | None = None
+        self.page_cache: PageCache | None = None
         self.node_announce_handler: NodeAnnounceHandler | None = None
         self._announce_task: asyncio.Task | None = None
         self._poll_task: asyncio.Task | None = None
@@ -93,6 +95,10 @@ class CoreService:
         self.db = Database(self.paths.db_path)
         self.db.open()
         self.settings = SettingsStore(self.db)
+        self.page_cache = PageCache(self.db)
+        # Keep offline browsing bounded: <= 500 pages, drop entries older than
+        # 30 days once per boot.
+        self.page_cache.prune()
 
         self.bus.bind(asyncio.get_running_loop())
         await self.bus.start()
@@ -642,14 +648,64 @@ class CoreService:
             )
         return data, name, elapsed
 
+    async def _cache_get(self, node_hash: str, path: str) -> dict[str, Any] | None:
+        if self.page_cache is None:
+            return None
+        async with self._db_lock:
+            return self.page_cache.get(node_hash, path)
+
+    async def _cache_put(self, node_hash: str, path: str, content: str) -> None:
+        if self.page_cache is None:
+            return
+        async with self._db_lock:
+            self.page_cache.put(node_hash, path, content)
+
+    @staticmethod
+    def _cached_page(
+        node_hash: str,
+        path: str,
+        cached: dict[str, Any],
+        *,
+        stale: bool,
+        elapsed_ms: float,
+        error: str | None = None,
+    ) -> dict[str, Any]:
+        content = str(cached["content"])
+        result = {
+            "node_hash": node_hash,
+            "path": path,
+            "content": content,
+            "bytes": int(cached["content_bytes"] or len(content.encode("utf-8"))),
+            "elapsed_ms": elapsed_ms,
+            "served_from_cache": True,
+            "stale": stale,
+            "cached_ts": cached["fetched_ts"],
+        }
+        if error is not None:
+            result["error"] = error
+        return result
+
     async def browse_page(
         self,
         node_hash: str,
         path: str,
         transfer_id: str | None = None,
+        *,
+        refresh: bool = False,
+        max_age: float = 3600.0,
     ) -> dict[str, Any]:
         path = normalize_page_path(path)
         started = time.time()
+        cached = await self._cache_get(node_hash, path)
+        if (
+            cached is not None
+            and not refresh
+            and (time.time() - float(cached["fetched_ts"])) <= max_age
+        ):
+            return self._cached_page(
+                node_hash, path, cached, stale=False, elapsed_ms=0.0
+            )
+
         progress = self._transfer_emitter(transfer_id, path, "page")
         try:
             data = await asyncio.wait_for(
@@ -657,12 +713,34 @@ class CoreService:
                 timeout=40,
             )
         except PageFetchError as exc:
-            self._transfer_failed(transfer_id, path, str(exc))
-            raise ValueError(str(exc)) from None
+            error = str(exc)
+            self._transfer_failed(transfer_id, path, error)
+            if cached is not None:
+                return self._cached_page(
+                    node_hash,
+                    path,
+                    cached,
+                    stale=True,
+                    elapsed_ms=round((time.time() - started) * 1000, 1),
+                    error=error,
+                )
+            raise ValueError(error) from None
         except TimeoutError:
             self._transfer_failed(transfer_id, path, "link_timeout")
+            if cached is not None:
+                return self._cached_page(
+                    node_hash,
+                    path,
+                    cached,
+                    stale=True,
+                    elapsed_ms=round((time.time() - started) * 1000, 1),
+                    error="link_timeout",
+                )
             raise ValueError("link_timeout") from None
+
         elapsed = round((time.time() - started) * 1000, 1)
+        content = data.decode("utf-8", "replace")
+        await self._cache_put(node_hash, path, content)
         if transfer_id:
             self.bus.publish(
                 "transfer_complete",
@@ -676,7 +754,10 @@ class CoreService:
         return {
             "node_hash": node_hash,
             "path": path,
-            "content": data.decode("utf-8", "replace"),
+            "content": content,
             "bytes": len(data),
             "elapsed_ms": elapsed,
+            "served_from_cache": False,
+            "stale": False,
+            "cached_ts": None,
         }

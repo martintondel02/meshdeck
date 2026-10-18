@@ -48,6 +48,17 @@ CREATE TABLE IF NOT EXISTS nodes(
   last_seen REAL
 );
 """),
+    (3, """
+CREATE TABLE IF NOT EXISTS page_cache(
+  node_hash TEXT NOT NULL,
+  path TEXT NOT NULL,
+  content TEXT NOT NULL,
+  content_bytes INTEGER,
+  fetched_ts REAL,
+  PRIMARY KEY(node_hash, path)
+);
+CREATE INDEX IF NOT EXISTS idx_page_cache_ts ON page_cache(fetched_ts);
+"""),
 ]
 
 

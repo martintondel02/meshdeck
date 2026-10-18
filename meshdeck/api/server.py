@@ -331,11 +331,18 @@ class ApiServer:
         return _json(self.service.list_nodes())
 
     async def _browse_page(self, request: web.Request) -> web.Response:
+        refresh = request.query.get("refresh", "").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         return _json(
             await self.service.browse_page(
                 request.match_info["hash"],
                 request.match_info["path"],
                 transfer_id=request.query.get("transfer_id") or None,
+                refresh=refresh,
             )
         )
 

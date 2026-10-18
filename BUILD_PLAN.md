@@ -756,8 +756,13 @@ throttles (10 % / 250 ms) and publishes only through
 REST shape. Verified with an 8 MiB two-node integration test and a browser
 run of the progress bar.
 
+**P4.2 done (2026-10-18):** page cache — DB v3 `page_cache`, 4 MiB/entry,
+500 rows, 30-day prune; fresh hits are instant, unreachable nodes fall back
+to a stale saved copy, `?refresh=1` forces a live fetch. Verified with a
+kill-the-host integration test and a browser run of the cached/stale badges.
+
 **Phase 4 remaining:** `/media` handler (image conversion needs Pillow;
-deferred), page caching, executable pages (deliberately not supported).
+deferred), executable pages (deliberately not supported).
 
 **P4.5 + P4.4 done (2026-10-18):** vitest suite (26 tests) plus the reader
 fix. Two real bugs were found by browser E2E that the unit/integration suites

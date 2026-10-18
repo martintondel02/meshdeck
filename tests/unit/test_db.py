@@ -10,16 +10,16 @@ from meshdeck.storage.db import Database
 
 def test_migrate_creates_schema(tmp_path):
     with Database(tmp_path / "t.db") as db:
-        assert db.user_version == 2
+        assert db.user_version == 3
         tables = {r[0] for r in db.query("SELECT name FROM sqlite_master WHERE type='table'")}
-        assert {"settings", "peers", "messages", "nodes"} <= tables
+        assert {"settings", "peers", "messages", "nodes", "page_cache"} <= tables
 
 
 def test_migrate_is_idempotent(tmp_path):
     with Database(tmp_path / "t.db") as db:
         db.migrate()
         db.migrate()
-        assert db.user_version == 2
+        assert db.user_version == 3
 
 
 def test_peer_upsert_and_patch(tmp_path):

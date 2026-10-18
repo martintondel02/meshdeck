@@ -121,6 +121,10 @@ export interface BrowseResult {
   content: string;
   bytes: number;
   elapsed_ms: number;
+  served_from_cache: boolean;
+  stale: boolean;
+  cached_ts: number | null;
+  error?: string;
 }
 
 export const pages = writable<PageMeta[]>([]);

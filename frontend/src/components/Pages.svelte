@@ -16,6 +16,7 @@
     type SharedFile,
   } from "../lib/stores";
   import { renderMicron } from "../lib/micron";
+  import { timeAgo } from "../lib/format";
   import { TOOLTIPS } from "../lib/copy/tooltips";
 
   // editor state
@@ -158,14 +159,17 @@
     return path.startsWith("/page/") || path.startsWith("/file/") ? path : "/page/" + path;
   }
 
-  async function fetchPage(node: string, path: string) {
+  async function fetchPage(node: string, path: string, refresh = false) {
     browsing = true;
     browseErr = "";
     pageResult = null;
     transferId = beginTransfer("page", path);
+    const query = `?transfer_id=${encodeURIComponent(transferId)}${
+      refresh ? "&refresh=1" : ""
+    }`;
     try {
       pageResult = await api<BrowseResult>(
-        `/api/v1/browse/${encodeURIComponent(node)}${path}?transfer_id=${encodeURIComponent(transferId)}`,
+        `/api/v1/browse/${encodeURIComponent(node)}${path}${query}`,
       );
     } catch (e) {
       browseErr = browseErrorText(e);
@@ -489,9 +493,28 @@
           {/if}
           {#if pageResult}
             <span class="font-mono break-all">{pageResult.path}</span>
-            <span
-              >— {pageResult.bytes} bytes, {pageResult.elapsed_ms} ms via on-network
-              link</span
+            {#if pageResult.served_from_cache}
+              <span
+                class="rounded-full border border-wp-border px-2 py-0.5 {pageResult.stale
+                  ? 'text-wp-danger'
+                  : 'text-wp-dim'}"
+              >
+                {pageResult.stale
+                  ? "saved copy — node unreachable"
+                  : `cached · ${timeAgo(pageResult.cached_ts)}`}
+              </span>
+            {:else}
+              <span
+                >— {pageResult.bytes} bytes, {pageResult.elapsed_ms} ms via
+                on-network link</span
+              >
+            {/if}
+            <button
+              class="hover:text-wp-accent"
+              disabled={browsing}
+              onclick={() =>
+                fetchPage(browseHash, pageResult?.path ?? browsePath, true)}
+              >Refresh</button
             >
           {/if}
         </div>

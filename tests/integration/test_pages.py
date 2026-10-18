@@ -367,3 +367,70 @@ def test_large_file_transfer_progress(tmp_path):
     finally:
         proc_a.terminate()
         proc_a.wait(timeout=20)
+
+
+def test_page_cache_serves_saved_copy_after_host_dies(tmp_path):
+    """B fetches a page live, A is killed, B tries again with an expired cache
+    and gets the byte-identical saved copy with stale=True instead of an error."""
+    port_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    port_socket.bind(("127.0.0.1", 0))
+    port = port_socket.getsockname()[1]
+    port_socket.close()
+
+    dir_a = tmp_path / "node_a"
+    dir_b = tmp_path / "node_b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    (dir_a / "pages").mkdir()
+    (dir_a / "pages" / "index.mu").write_text(PAGE, encoding="utf-8")
+
+    proc_a = launch_node(
+        dir_a,
+        SERVER_EXTRA.format(port=port),
+        "CacheHost",
+        serve_node="Cache Node",
+    )
+    try:
+        assert wait_for_file(dir_a / "ready.json", BOOT_TIMEOUT)
+        node_hash_a = _read_published_hash(proc_a)
+        assert node_hash_a
+
+        trigger = dir_b / "refetch.flag"
+        proc_b = launch_node(
+            dir_b,
+            CLIENT_EXTRA.format(port=port),
+            "CacheReader",
+            fetch_page_from=node_hash_a,
+            second_fetch_trigger=str(trigger),
+        )
+        try:
+            assert wait_for_file(dir_b / "first_fetch.json", TEST_TIMEOUT), (
+                "B never fetched the page the first time"
+            )
+            first = json.loads((dir_b / "first_fetch.json").read_text())
+            assert first["served_from_cache"] is False
+            assert first["content"] == PAGE
+
+            # Host goes away for good; expire the cache and ask again.
+            proc_a.terminate()
+            proc_a.wait(timeout=20)
+            trigger.touch()
+
+            assert wait_for_file(dir_b / "done.json", TEST_TIMEOUT), (
+                "B never finished the offline refetch\n"
+                + "\n".join(f"[B] {ln}" for ln in _dump(proc_b.stdout))
+            )
+            result = json.loads((dir_b / "done.json").read_text())
+            second = result["refetched"]
+            assert second["served_from_cache"] is True
+            assert second["stale"] is True
+            assert second["content"] == first["content"]
+            assert second["error"] in {"no_path", "link_timeout"}
+            assert second["cached_ts"] is not None
+        finally:
+            proc_b.terminate()
+            proc_b.wait(timeout=20)
+    finally:
+        if proc_a.poll() is None:
+            proc_a.terminate()
+            proc_a.wait(timeout=20)

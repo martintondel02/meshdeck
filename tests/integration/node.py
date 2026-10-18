@@ -99,8 +99,24 @@ async def run(args: argparse.Namespace) -> int:
             for attempt in range(60):
                 try:
                     r = await service.browse_page(args.fetch_page_from, args.page_path)
-                    result["ok"] = True
                     result["fetched"] = r
+                    if args.second_fetch_trigger:
+                        # Hand the first (live) result to the parent, then wait
+                        # until it has killed the host before refetching with a
+                        # zero max_age so the cache can only be a stale fallback.
+                        (Path(args.data_dir) / "first_fetch.json").write_text(
+                            json.dumps(r), encoding="utf-8"
+                        )
+                        jlog(event="first_fetch_done", path=r["path"])
+                        trigger = Path(args.second_fetch_trigger)
+                        while not trigger.exists():
+                            await asyncio.sleep(0.2)
+                        r2 = await service.browse_page(
+                            args.fetch_page_from, args.page_path, max_age=0
+                        )
+                        result["refetched"] = r2
+                        jlog(event="second_fetch_done", stale=r2.get("stale"))
+                    result["ok"] = True
                     done_condition.set()
                     return
                 except ValueError as exc:
@@ -234,6 +250,8 @@ def main() -> int:
     parser.add_argument("--fetch-page-from", default=None,
                         help="fetch a page from this node destination hash")
     parser.add_argument("--page-path", default="/page/index.mu")
+    parser.add_argument("--second-fetch-trigger", default=None,
+                        help="after the first page fetch, refetch when this file appears")
     parser.add_argument("--fetch-file-from", default=None,
                         help="download a shared file from this node destination hash")
     parser.add_argument("--file-name", default=None,

@@ -4,6 +4,17 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added (Phase 4 — page cache)
+
+- Offline browsing: every successfully fetched page is cached (DB schema v3,
+  max 4 MiB per page, 500 pages, 30-day prune). Fresh hits answer instantly;
+  when a node is unreachable the reader shows a “saved copy — node
+  unreachable” badge instead of an error, with a Refresh button that forces
+  a live re-fetch (`?refresh=1`). Cached pages show a “cached · 2h ago”
+  badge.
+- Tests: cache repo unit tests, fresh/stale/refresh service tests, and a
+  two-node integration test that kills the host and serves the saved copy.
+
 ### Added (Phase 4 — transfer progress)
 
 - Progress for large node transfers: page and `/file/` fetches report
