@@ -8,6 +8,7 @@
     nodeInfo,
     nodes,
     pages,
+    status,
     transfers,
     type BrowseResult,
     type NodeInfo,
@@ -108,7 +109,8 @@
       await openPage(name);
       pages.set(await api<PageMeta[]>("/api/v1/pages"));
     } catch (e) {
-      edMsg = e instanceof Error ? e.message : t("common.failed");
+      const code = e instanceof Error ? e.message : "";
+      edMsg = storageErrorText(code) ?? (code || t("common.failed"));
     }
   }
 
@@ -124,7 +126,8 @@
       edMsg = t("pages.saved");
       pages.set(await api<PageMeta[]>("/api/v1/pages"));
     } catch (e) {
-      edMsg = e instanceof Error ? e.message : t("pages.error_save");
+      const code = e instanceof Error ? e.message : "";
+      edMsg = storageErrorText(code) ?? (code || t("pages.error_save"));
     }
   }
 
@@ -260,7 +263,8 @@
       sharedMsg = t("pages.shared_ok");
       await loadShared();
     } catch (e) {
-      sharedMsg = e instanceof Error ? e.message : t("pages.error_upload");
+      const code = e instanceof Error ? e.message : "";
+      sharedMsg = storageErrorText(code) ?? (code || t("pages.error_upload"));
     }
   }
 
@@ -297,6 +301,19 @@
   }
 
   const rendered = $derived(renderMicron(editor));
+  const live = $derived($status);
+
+  function binarySize(bytes: number): string {
+    if (bytes <= 0) return "0 B";
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function storageErrorText(code: string): string | null {
+    return code === "shared_storage_full" || code === "pages_storage_full"
+      ? t("pages.error_storage_full")
+      : null;
+  }
 </script>
 
 <div class="p-6 max-w-5xl mx-auto space-y-8">
@@ -318,6 +335,20 @@
           <code class="select-all">{$nodeInfo.node_hash}</code>
         </div>
       {/if}
+      <p class="text-xs text-wp-dim" role="status" aria-live="polite">
+        {#if live?.pages_storage_max_bytes}
+          {t("pages.my_pages_usage", {
+            used: binarySize(live.pages_bytes ?? 0),
+            limit: binarySize(live.pages_storage_max_bytes),
+            count: live.pages_entries ?? 0,
+          })}
+        {:else}
+          {t("pages.my_pages_usage_unlimited", {
+            used: binarySize(live?.pages_bytes ?? 0),
+            count: live?.pages_entries ?? 0,
+          })}
+        {/if}
+      </p>
 
       <div class="flex gap-2">
         <input
@@ -540,6 +571,20 @@
     </h2>
     <p class="text-xs text-wp-dim">
       {t("pages.shared_intro")}
+    </p>
+    <p class="text-xs text-wp-dim" role="status" aria-live="polite">
+      {#if live?.shared_storage_max_bytes}
+        {t("pages.shared_usage", {
+          used: binarySize(live.shared_bytes ?? 0),
+          limit: binarySize(live.shared_storage_max_bytes),
+          count: live.shared_files ?? 0,
+        })}
+      {:else}
+        {t("pages.shared_usage_unlimited", {
+          used: binarySize(live?.shared_bytes ?? 0),
+          count: live?.shared_files ?? 0,
+        })}
+      {/if}
     </p>
 
     <div class="flex flex-wrap items-center gap-3">

@@ -97,7 +97,15 @@ class ApiServer:
     # -- app construction --------------------------------------------------
 
     def build_app(self) -> web.Application:
-        app = web.Application(middlewares=[self._auth_middleware])
+        # aiohttp's default body limit is 1 MiB, which is below both the 4 MiB
+        # page cap and the 32 MiB shared-file cap, so a legitimate upload would
+        # be rejected with 413 before reaching the store. Allow the largest
+        # documented payload plus multipart overhead; the store layers enforce
+        # the real per-file/total caps.
+        app = web.Application(
+            middlewares=[self._auth_middleware],
+            client_max_size=MAX_SHARED_BYTES + 1024 * 1024,
+        )
         app.router.add_get("/api/v1/status", self._status)
         app.router.add_get("/api/v1/identity", self._identity)
         app.router.add_post("/api/v1/identity/display_name", self._set_display_name)
@@ -283,12 +291,19 @@ class ApiServer:
         return _json(result, status=202)
 
     async def _download_attachment(self, request: web.Request) -> web.Response:
-        resolved = self.service.get_attachment(
-            request.match_info["peer"],
-            request.match_info["msg"],
-            int(request.match_info["index"]),
-        )
+        peer = request.match_info["peer"]
+        msg = request.match_info["msg"]
+        index = int(request.match_info["index"])
+        resolved = self.service.get_attachment(peer, msg, index)
         if resolved is None:
+            # A pruned blob keeps its message metadata: answer with a code the
+            # UI can explain, not a bare 404.
+            if self.service.attachment_known(peer, msg, index):
+                return _error(
+                    404,
+                    "attachment_pruned",
+                    "the attachment is no longer stored (removed by retention)",
+                )
             return _error(404, "not_found", "attachment not found")
         path, safe_name = resolved
         return web.FileResponse(

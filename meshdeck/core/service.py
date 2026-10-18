@@ -26,30 +26,38 @@ from meshdeck.chat.router import (
     sanitize_filename,
 )
 from meshdeck.config import (
+    ATTACHMENT_STORAGE_MAX_MB_MAX,
     DEFAULT_SETTINGS,
     DELIVERY_METHODS,
+    LOG_MAX_MB_MAX,
     PAGE_CACHE_MAX_BYTES_CEILING,
+    PAGES_STORAGE_MAX_MB_MAX,
     PROPAGATION_STORAGE_LIMIT_MB_MAX,
+    RETENTION_DAYS_MAX,
+    SHARED_STORAGE_MAX_MB_MAX,
     VALID_MODES,
     AppPaths,
     SettingsStore,
     coerce_setting_int,
+    mb_to_bytes,
 )
 from meshdeck.core.events import Event, EventBus
 from meshdeck.pages.client import PageFetchError, fetch_file, fetch_page, normalize_page_path
-from meshdeck.pages.files import SharedFileError
+from meshdeck.pages.files import SharedFileError, SharedStorageFull
 from meshdeck.pages.hosting import NodeAnnounceHandler, PageHost
-from meshdeck.pages.storage import PageNameError
+from meshdeck.pages.storage import PageNameError, PageStorageFull
 from meshdeck.rns.config_gen import render_config, validate_interfaces
 from meshdeck.rns.identity import IdentityManager
 from meshdeck.rns.stack import InvalidConfigError, RnsStack, validate_interface_config
 from meshdeck.storage import messages as msg_repo
 from meshdeck.storage import nodes as node_repo
 from meshdeck.storage import peers as peer_repo
+from meshdeck.storage.attachments import attachment_usage, prune_attachments
 from meshdeck.storage.db import Database
 from meshdeck.storage.page_cache import DEFAULT_MAX_BYTES as DEFAULT_PAGE_CACHE_BYTES
 from meshdeck.storage.page_cache import PageCache
 from meshdeck.util.hexid import is_valid_hash_hex, is_valid_msg_hash_hex
+from meshdeck.util.logs import log_usage
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +73,22 @@ RESTART_SETTINGS = {
     "log_level",
 }
 EDITABLE_SETTINGS = set(DEFAULT_SETTINGS) | {"display_name", "mode"}
+
+# Numeric storage/retention settings: (minimum, maximum). Validated before any
+# key of a PUT is written; out-of-range or non-int values are rejected with 400.
+NUMERIC_SETTINGS: dict[str, tuple[int, int]] = {
+    "page_cache_max_bytes": (0, PAGE_CACHE_MAX_BYTES_CEILING),
+    "propagation_storage_limit_mb": (0, PROPAGATION_STORAGE_LIMIT_MB_MAX),
+    "attachment_storage_max_mb": (0, ATTACHMENT_STORAGE_MAX_MB_MAX),
+    "attachment_retention_days": (0, RETENTION_DAYS_MAX),
+    "shared_storage_max_mb": (0, SHARED_STORAGE_MAX_MB_MAX),
+    "pages_storage_max_mb": (0, PAGES_STORAGE_MAX_MB_MAX),
+    "message_retention_days": (0, RETENTION_DAYS_MAX),
+    "log_max_mb": (0, LOG_MAX_MB_MAX),
+}
+
+# Message history retention is enforced at boot and then once a day.
+MESSAGE_PRUNE_INTERVAL_SECONDS = 24 * 3600
 
 # poll interval for outbound message state progression (callback fallback)
 PENDING_POLL_SECONDS = 2.0
@@ -85,6 +109,7 @@ class CoreService:
         self.node_announce_handler: NodeAnnounceHandler | None = None
         self._announce_task: asyncio.Task | None = None
         self._poll_task: asyncio.Task | None = None
+        self._maintenance_task: asyncio.Task | None = None
         self._started_ts = 0.0
         self._db_lock = asyncio.Lock()
         # Set by the API; supervised by the CLI, which re-execs the process
@@ -103,6 +128,9 @@ class CoreService:
         # Second belt: drop entries older than 30 days and cap the row count
         # once per boot. The byte ceiling above is enforced on every put.
         self.page_cache.prune()
+        # Phase 7.1: apply the explicit attachment/retention policies at boot.
+        self.prune_attachments()
+        self.prune_message_history()
 
         self.bus.bind(asyncio.get_running_loop())
         await self.bus.start()
@@ -131,6 +159,8 @@ class CoreService:
             propagation_node_hash=self.settings.get("propagation_node_hash") or "",
             host_propagation_node=bool(self.settings.get("host_propagation_node")),
             propagation_storage_limit_mb=self._propagation_storage_limit_mb(),
+            attachment_storage_max_mb=self._attachment_storage_max_mb(),
+            attachment_retention_days=self._attachment_retention_days(),
         )
         # NOTE: like RNS.Reticulum, LXMF.LXMRouter installs signal handlers in
         # its constructor — must run on the main thread. Construction is fast.
@@ -146,7 +176,12 @@ class CoreService:
 
         # Page hosting: nomadnetwork.node destination + announce handler.
         self.pages = PageHost(
-            self.paths.pages_dir, self.identity, self.bus, shared_dir=self.paths.shared_dir
+            self.paths.pages_dir,
+            self.identity,
+            self.bus,
+            shared_dir=self.paths.shared_dir,
+            pages_max_bytes=mb_to_bytes(self._pages_storage_max_mb()),
+            shared_max_bytes=mb_to_bytes(self._shared_storage_max_mb()),
         )
         self.pages.start(node_name=self.settings.get("node_name") or "")
         self.node_announce_handler = NodeAnnounceHandler(
@@ -159,11 +194,12 @@ class CoreService:
         await asyncio.to_thread(self.chat.announce)
         self._announce_task = asyncio.create_task(self._announce_loop())
         self._poll_task = asyncio.create_task(self._poll_pending_loop())
+        self._maintenance_task = asyncio.create_task(self._maintenance_loop())
         self._started_ts = time.time()
         log.info("meshdeck core started")
 
     async def stop(self) -> None:
-        for task in (self._announce_task, self._poll_task):
+        for task in (self._announce_task, self._poll_task, self._maintenance_task):
             if task:
                 task.cancel()
         if self.announce_handler is not None:
@@ -204,6 +240,17 @@ class CoreService:
                             )
             except Exception:  # noqa: BLE001
                 log.exception("pending poll failed")
+
+    async def _maintenance_loop(self) -> None:
+        """Daily retention pass (message history); boot already ran once."""
+        while True:
+            await asyncio.sleep(MESSAGE_PRUNE_INTERVAL_SECONDS)
+            try:
+                removed = self.prune_message_history()
+                if removed:
+                    self.bus.publish("messages_pruned", {"removed": removed})
+            except Exception:  # noqa: BLE001
+                log.exception("daily message retention failed")
 
     # -- persistence subscriber (runs on the asyncio loop) ----------------------
 
@@ -275,6 +322,97 @@ class CoreService:
             return value
         return 256
 
+    def _int_setting(self, key: str, default: int) -> int:
+        """Read an integer setting defensively (corrupt JSON -> default)."""
+        value = self.settings.get(key, default)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+        return default
+
+    def _attachment_storage_max_mb(self) -> int:
+        return self._int_setting("attachment_storage_max_mb", 512)
+
+    def _attachment_retention_days(self) -> int:
+        return self._int_setting("attachment_retention_days", 0)
+
+    def _shared_storage_max_mb(self) -> int:
+        return self._int_setting("shared_storage_max_mb", 1024)
+
+    def _pages_storage_max_mb(self) -> int:
+        return self._int_setting("pages_storage_max_mb", 256)
+
+    def _message_retention_days(self) -> int:
+        return self._int_setting("message_retention_days", 0)
+
+    def _log_max_mb(self) -> int:
+        return self._int_setting("log_max_mb", 10)
+
+    # -- Phase 7.1 retention / pruning ----------------------------------------
+
+    def prune_attachments(self) -> dict[str, Any]:
+        """Apply the configured attachment policy (blobs only; rows survive)."""
+        result = prune_attachments(
+            self.paths.files_dir,
+            max_bytes=mb_to_bytes(self._attachment_storage_max_mb()),
+            retention_days=self._attachment_retention_days(),
+        )
+        if result.get("attachment_removed"):
+            log.info(
+                "attachment retention removed %s blob(s), freed %s bytes",
+                result["attachment_removed"],
+                result["attachment_freed_bytes"],
+            )
+        return result
+
+    def prune_message_history(self) -> int:
+        """Delete messages older than ``message_retention_days`` (0 = keep).
+
+        Peers and discovered nodes are never touched. No automatic VACUUM: see
+        ``storage.messages.prune_older_than`` for the documented reasoning.
+        """
+        days = self._message_retention_days()
+        if days <= 0 or self.db is None:
+            return 0
+        cutoff = time.time() - days * 86400
+        removed = msg_repo.prune_older_than(self.db, cutoff)
+        if removed:
+            log.info("message retention removed %s message(s) older than %s days", removed, days)
+        return removed
+
+    def storage_usage(self) -> dict[str, Any]:
+        """Every bounded store's usage/limit, for /status and the Storage card."""
+        attachment = attachment_usage(self.paths.files_dir)
+        shared = (
+            {
+                "shared_bytes": self.pages.files.total_bytes(),
+                "shared_files": self.pages.files.count(),
+            }
+            if self.pages is not None
+            else {"shared_bytes": 0, "shared_files": 0}
+        )
+        pages = (
+            {
+                "pages_bytes": self.pages.store.total_bytes(),
+                "pages_entries": self.pages.store.count(),
+            }
+            if self.pages is not None
+            else {"pages_bytes": 0, "pages_entries": 0}
+        )
+        return {
+            **self.page_cache_usage(),
+            **attachment,
+            "attachment_storage_max_bytes": mb_to_bytes(self._attachment_storage_max_mb()),
+            "attachment_retention_days": self._attachment_retention_days(),
+            **shared,
+            "shared_storage_max_bytes": mb_to_bytes(self._shared_storage_max_mb()),
+            **pages,
+            "pages_storage_max_bytes": mb_to_bytes(self._pages_storage_max_mb()),
+            "message_count": msg_repo.count_messages(self.db) if self.db is not None else 0,
+            "message_retention_days": self._message_retention_days(),
+            **log_usage(self.paths),
+            "log_max_bytes": mb_to_bytes(self._log_max_mb()),
+        }
+
     def page_cache_usage(self) -> dict[str, Any]:
         cache = self.page_cache
         if cache is None:
@@ -316,7 +454,7 @@ class CoreService:
             "propagation_storage_limit_bytes": (
                 self.chat.propagation_storage_limit_bytes if self.chat else 0
             ),
-            **self.page_cache_usage(),
+            **self.storage_usage(),
         }
 
     def identity_info(self) -> dict[str, Any]:
@@ -348,7 +486,34 @@ class CoreService:
     def list_messages(
         self, peer_hash: str, before: float | None = None, limit: int = 50
     ) -> list[dict[str, Any]]:
-        return msg_repo.list_messages(self.db, peer_hash, before=before, limit=limit)
+        rows = msg_repo.list_messages(self.db, peer_hash, before=before, limit=limit)
+        for row in rows:
+            available = self._attachment_availability(row)
+            if available is not None:
+                row["attachments_available"] = available
+        return rows
+
+    def _attachment_availability(self, row: dict[str, Any]) -> list[bool] | None:
+        """Per-attachment blob presence for an inbound message (None if N/A).
+
+        Pruned blobs keep their message metadata; the UI uses this to render a
+        non-clickable "attachment no longer stored" tombstone."""
+        if row.get("direction") != msg_repo.INBOUND or not row.get("fields_json"):
+            return None
+        try:
+            meta = json.loads(row["fields_json"]).get("attachments") or []
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return None
+        if not meta:
+            return None
+        return [
+            self._attachment_blob(
+                row["peer_hash"], row["hash"], int(entry.get("index", -1))
+            )
+            is not None
+            for entry in meta
+            if isinstance(entry, dict)
+        ]
 
     def _ensure_peer_row(self, peer_hash: str) -> None:
         """Guarantee the peers row exists before inserting a message.
@@ -470,10 +635,9 @@ class CoreService:
             "path_requested": not known,
         }
 
-    def get_attachment(
+    def _attachment_blob(
         self, peer_hash: str, msg_hash: str, index: int
-    ) -> tuple[Path, str] | None:
-        """Resolve a stored inbound attachment for download. (path, safe_name)"""
+    ) -> Path | None:
         if not (is_valid_hash_hex(peer_hash) and is_valid_msg_hash_hex(msg_hash)):
             return None
         if index < 0 or index > 64:
@@ -484,32 +648,55 @@ class CoreService:
             return None
         for candidate in sorted(directory.glob(f"{index}_*")):
             if candidate.is_file() and candidate.resolve().is_relative_to(base):
-                return candidate, candidate.name[len(str(index)) + 1 :]
+                return candidate
         return None
+
+    def get_attachment(
+        self, peer_hash: str, msg_hash: str, index: int
+    ) -> tuple[Path, str] | None:
+        """Resolve a stored inbound attachment for download. (path, safe_name)"""
+        candidate = self._attachment_blob(peer_hash, msg_hash, index)
+        if candidate is None:
+            return None
+        return candidate, candidate.name[len(str(index)) + 1 :]
+
+    def attachment_known(self, peer_hash: str, msg_hash: str, index: int) -> bool:
+        """True when the message metadata lists this attachment but the blob is gone.
+
+        Lets the download route answer ``404 attachment_pruned`` instead of a
+        generic ``not_found`` after retention removed the blob."""
+        if not (is_valid_hash_hex(peer_hash) and is_valid_msg_hash_hex(msg_hash)):
+            return False
+        if index < 0 or index > 64:
+            return False
+        row = msg_repo.get_message(self.db, msg_hash)
+        if row is None or row["peer_hash"] != peer_hash:
+            return False
+        if row.get("direction") != msg_repo.INBOUND or not row.get("fields_json"):
+            return False
+        try:
+            meta = json.loads(row["fields_json"]).get("attachments") or []
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return False
+        return any(
+            isinstance(entry, dict) and int(entry.get("index", -1)) == index
+            for entry in meta
+        )
 
     def get_settings(self) -> dict[str, Any]:
         return self.settings.all()
 
     def update_settings(self, updates: dict[str, Any]) -> dict[str, Any]:
         restart_required = False
-        # Validate numeric disk limits before writing anything, so a bad value
-        # in the same PUT cannot leave earlier keys half-applied. Out-of-range
-        # is rejected (400), never silently clamped.
+        # Validate numeric disk/retention limits before writing anything, so a
+        # bad value in the same PUT cannot leave earlier keys half-applied.
+        # Out-of-range is rejected (400), never silently clamped.
         limits: dict[str, int] = {}
-        if "page_cache_max_bytes" in updates:
-            limits["page_cache_max_bytes"] = coerce_setting_int(
-                "page_cache_max_bytes",
-                updates["page_cache_max_bytes"],
-                0,
-                PAGE_CACHE_MAX_BYTES_CEILING,
-            )
-        if "propagation_storage_limit_mb" in updates:
-            limits["propagation_storage_limit_mb"] = coerce_setting_int(
-                "propagation_storage_limit_mb",
-                updates["propagation_storage_limit_mb"],
-                0,
-                PROPAGATION_STORAGE_LIMIT_MB_MAX,
-            )
+        for key, (minimum, maximum) in NUMERIC_SETTINGS.items():
+            if key in updates:
+                limits[key] = coerce_setting_int(key, updates[key], minimum, maximum)
+        # Side effects the caller/UI can report (pruned counts, evictions).
+        effects: dict[str, Any] = {}
         for key, value in updates.items():
             if key not in EDITABLE_SETTINGS:
                 continue
@@ -575,8 +762,60 @@ class CoreService:
                         "propagation_node_hash": self.chat.propagation_node_hash_hex,
                     },
                 )
+        # Phase 7.1: live-apply the new bounds. Saving a retention value is the
+        # explicit user action that authorises the first prune; nothing is
+        # deleted silently in the background beyond the documented policy.
+        if "attachment_storage_max_mb" in limits or "attachment_retention_days" in limits:
+            applied_limits = {
+                "attachment_storage_max_mb": self._attachment_storage_max_mb(),
+                "attachment_retention_days": self._attachment_retention_days(),
+            }
+            if self.chat is not None:
+                applied_limits = self.chat.set_attachment_limits(
+                    applied_limits["attachment_storage_max_mb"],
+                    applied_limits["attachment_retention_days"],
+                )
+            pruned = self.prune_attachments()
+            effects.update(pruned)
+            self.bus.publish(
+                "settings_updated",
+                {**applied_limits, **pruned},
+            )
+        if "shared_storage_max_mb" in limits and self.pages is not None:
+            applied = self.pages.files.set_max_bytes(
+                mb_to_bytes(limits["shared_storage_max_mb"])
+            )
+            self.bus.publish(
+                "settings_updated",
+                {
+                    "shared_storage_max_bytes": applied,
+                    "shared_bytes": self.pages.files.total_bytes(),
+                },
+            )
+        if "pages_storage_max_mb" in limits and self.pages is not None:
+            applied = self.pages.store.set_max_bytes(
+                mb_to_bytes(limits["pages_storage_max_mb"])
+            )
+            self.bus.publish(
+                "settings_updated",
+                {"pages_storage_max_bytes": applied, "pages_bytes": self.pages.store.total_bytes()},
+            )
+        if "message_retention_days" in limits:
+            removed = self.prune_message_history()
+            effects["messages_pruned"] = removed
+            self.bus.publish(
+                "settings_updated",
+                {
+                    "message_retention_days": limits["message_retention_days"],
+                    "messages_pruned": removed,
+                },
+            )
+        if "log_max_mb" in limits:
+            # Rotation itself happens at the next startup (before RNS starts).
+            self.bus.publish("settings_updated", {"log_max_mb": limits["log_max_mb"]})
         result = self.settings.all()
         result["restart_required"] = restart_required
+        result["effects"] = effects
         return result
 
     async def announce_now(self) -> dict[str, Any]:
@@ -629,6 +868,8 @@ class CoreService:
     def save_page(self, name: str, content: str) -> dict[str, Any]:
         try:
             result = self.pages.store.write(name, content)
+        except PageStorageFull:
+            raise ValueError("pages_storage_full") from None
         except PageNameError as exc:
             raise ValueError("invalid_page_name") from exc
         self.pages.register_all_pages()
@@ -678,6 +919,8 @@ class CoreService:
     def share_file(self, name: str, data: bytes) -> dict[str, Any]:
         try:
             result = self.pages.files.save(name, data)
+        except SharedStorageFull:
+            raise ValueError("shared_storage_full") from None
         except SharedFileError as exc:
             raise ValueError(f"invalid_file:{exc}") from None
         self.pages.register_all_files()

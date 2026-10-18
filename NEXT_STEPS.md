@@ -669,9 +669,12 @@ in `/status` and Settings, with Clear cache. Limits reject invalid input with
 400.
 
 ### Remaining follow-ups
-- Cap the other unbounded stores: chat attachments (kept forever), node-shared
-  files, hosted pages, SQLite history, logs.
-- Expose `page_cache_max_bytes` in the UI (currently API-only).
+- ✅ **Phase 7.1 (2026-10-19):** the other unbounded stores are now capped —
+  chat attachments (byte cap + optional age retention, blobs only), shared
+  files and hosted pages (refuse new writes above a cap; never auto-delete),
+  SQLite message history (optional age retention), and logs (startup rotation
+  with one `.1` backup). See `CHANGELOG.md` and `docs/handoffs/storage-bounds.md`.
+- ✅ `page_cache_max_bytes` is exposed in Settings → Advanced → Storage.
 - LXMF store-cap enforcement is periodic; optionally surface "will shrink
   within ~2 min" in the UI.
 - Flatpak build; screen-reader/keyboard-only walkthrough; timed fresh-clone

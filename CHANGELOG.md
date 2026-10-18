@@ -2,6 +2,46 @@
 
 All notable changes to MeshDeck. Format based on Keep a Changelog.
 
+## [Unreleased]
+
+### Added (Phase 7.1 — bounded remaining stores)
+
+- **Chat attachments are bounded and retainable.** Inbound attachment blobs
+  (under `files/<peer>/<msg>/`) now have a global ceiling
+  `attachment_storage_max_mb` (default **512 MiB**, `0` = unlimited; oldest
+  blobs evicted first) and an optional age policy
+  `attachment_retention_days` (default `0` = keep forever). Pruning runs at
+  boot, after every inbound attachment, and when the settings are saved. It
+  removes only blobs — message rows keep their metadata, the download route
+  answers `404 attachment_pruned`, and the chat chip becomes a non-clickable
+  "attachment no longer stored" tombstone.
+- **Node-shared files and hosted pages are capped without auto-deletion.**
+  `shared_storage_max_mb` (default **1024 MiB**) and
+  `pages_storage_max_mb` (default **256 MiB**) bound new writes. Existing
+  oversized stores are left alone; once a write would exceed the cap the
+  store refuses it and the API returns `400 shared_storage_full` /
+  `400 pages_storage_full`.
+- **Message history retention.** `message_retention_days` (default `0` =
+  keep forever) prunes messages at boot and once a day; peers and discovered
+  nodes are never removed. No automatic VACUUM (documented: the file is not
+  compacted immediately).
+- **Log rotation.** `log_max_mb` (default **10 MiB**, `0` = unlimited)
+  rotates `logs/meshdeck.log` and the generated `logs/reticulum.log` at
+  startup, before Reticulum starts, keeping one `.1` backup. Only MeshDeck's
+  own data directory is touched.
+- `GET /api/v1/status` now reports usage and limits for attachments, shared
+  files, hosted pages, message history and logs; `GET /settings` returns
+  every new key. Settings → Advanced → **Storage** shows used / limit for each
+  store, adds the previously API-only `page_cache_max_bytes` field, and
+  requires an explicit save before any retention pruning runs.
+- Fixed a latent body-size bug found while testing: aiohttp's default 1 MiB
+  request limit rejected legitimate 4 MiB pages and shared files below their
+  documented caps with `413`. The API now accepts the documented maximum
+  payload and lets the store layers enforce the real limits.
+- Tests: 62 new backend unit tests (142 total), a real-HTTP Phase 7.1
+  acceptance test, and a real-daemon probe (log rotation + `/status` usage
+  changing after writes).
+
 ## [0.1.1] - 2026-10-19
 
 ### Added (Phase 6 — post-release hardening)

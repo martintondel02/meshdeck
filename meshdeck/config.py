@@ -45,6 +45,22 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # LXMF propagation message store, in MB as LXMF itself counts them
     # (decimal: 1 MB = 1,000,000 bytes, matching RNS.prettysize output).
     "propagation_storage_limit_mb": 256,
+    # Phase 7.1: bound the remaining stores. All limits are live-applied;
+    # 0 = unlimited. File-backed stores use MiB (1 MiB = 1,048,576 bytes);
+    # only the LXMF propagation store above uses decimal MB (LXMF's unit).
+    # Chat attachment blobs under files/<peer>/<msg>/ (message rows survive).
+    "attachment_storage_max_mb": 512,
+    # 0 = keep forever; N > 0 deletes blobs older than N days (rows survive).
+    "attachment_retention_days": 0,
+    # User content: never auto-deleted. New writes are refused above the cap.
+    "shared_storage_max_mb": 1024,
+    "pages_storage_max_mb": 256,
+    # SQLite message history: 0 = keep forever; N > 0 prunes older messages
+    # (peers and discovered nodes are never pruned).
+    "message_retention_days": 0,
+    # Our logs (logs/meshdeck.log, logs/reticulum.log): rotated at startup,
+    # keeping one .1 backup. 0 = unlimited. Applies on the next start.
+    "log_max_mb": 10,
 }
 
 DELIVERY_METHODS = ("direct", "propagated", "opportunistic")
@@ -55,6 +71,20 @@ VALID_MODES = ("basic", "advanced")
 # never silently clamped, so the UI can always trust the stored value.
 PAGE_CACHE_MAX_BYTES_CEILING = 1024 * 1024 * 1024  # 1 GiB
 PROPAGATION_STORAGE_LIMIT_MB_MAX = 10240  # 10 GiB, the UI's documented range
+# Phase 7.1 bounds. Same policy: reject, never clamp.
+ATTACHMENT_STORAGE_MAX_MB_MAX = 102400  # 100 GiB
+SHARED_STORAGE_MAX_MB_MAX = 102400  # 100 GiB
+PAGES_STORAGE_MAX_MB_MAX = 10240  # 10 GiB (pages are capped at 4 MiB each)
+RETENTION_DAYS_MAX = 3650  # 10 years
+LOG_MAX_MB_MAX = 1024  # 1 GiB per log file
+
+MIB = 1024 * 1024
+
+
+def mb_to_bytes(megabytes: int) -> int:
+    """Binary MiB -> bytes for the file-backed stores (0 stays unlimited)."""
+    return max(0, int(megabytes)) * MIB
+
 
 
 def coerce_setting_int(key: str, value: Any, minimum: int, maximum: int) -> int:

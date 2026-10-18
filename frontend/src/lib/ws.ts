@@ -76,6 +76,8 @@ function handleEvent(event: string, data: Record<string, unknown>): void {
           : null,
         created_ts: (data.ts as number) ?? Date.now() / 1000,
         delivered_ts: null,
+        attachments_available:
+          (data.attachments_available as boolean[] | undefined) ?? null,
       });
       if (get(activePeer) !== hash) markUnread(hash);
       break;

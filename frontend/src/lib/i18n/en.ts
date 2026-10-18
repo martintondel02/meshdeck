@@ -83,6 +83,7 @@ export const en = {
     matches_other: "{count} matches",
     download_title: "Download {name}",
     download_attachment: "Download attachment:",
+    attachment_pruned: "attachment no longer stored",
     state_sending: "sending",
     state_sent: "sent",
     state_delivered: "delivered",
@@ -161,6 +162,12 @@ export const en = {
     error_file_too_big: "file is larger than 32 MiB",
     shared_ok: "shared ✓ — anyone with your node address can download it",
     error_upload: "upload failed",
+    error_storage_full:
+      "Storage is full for this kind of content — raise the limit in Settings → Storage or remove something.",
+    shared_usage: "Shared: {used} of {limit} ({count} files)",
+    shared_usage_unlimited: "Shared: {used} ({count} files, no limit)",
+    my_pages_usage: "Pages: {used} of {limit} ({count} pages)",
+    my_pages_usage_unlimited: "Pages: {used} ({count} pages, no limit)",
     download_started: "download started",
     copied: "copied to clipboard",
     copy_failed: "could not copy",
@@ -239,6 +246,50 @@ export const en = {
     cache_cleared_one: "Cache cleared — {count} page removed.",
     cache_cleared_other: "Cache cleared — {count} pages removed.",
     cache_clear_failed: "Could not clear the cache.",
+    page_cache_limit_label: "Page cache limit (bytes, 0 = unlimited)",
+    page_cache_limit_hint:
+      "The whole cache stays under this many bytes; the oldest pages are dropped first.",
+    page_cache_limit_saved: "Page-cache limit saved.",
+    page_cache_limit_invalid: "Enter a whole number from 0 to 1073741824 (1 GiB).",
+    attachments_usage: "Chat attachments: {used} of {limit} ({count} files)",
+    attachments_usage_unlimited:
+      "Chat attachments: {used} ({count} files, no limit)",
+    attachment_limit_label: "Attachment storage limit (MB, 0 = unlimited)",
+    attachment_retention_label:
+      "Delete attachment files older than (days, 0 = keep forever)",
+    attachment_retention_warn:
+      "Saving a non-zero retention deletes matching attachment files now. Message rows and their metadata are kept, and their chips become “attachment no longer stored”.",
+    attachments_saved:
+      "Attachment limits saved — {removed} file(s) removed, {freed} freed.",
+    attachments_invalid: "Enter a whole number in the shown range.",
+    shared_usage: "Shared files: {used} of {limit} ({count} files)",
+    shared_usage_unlimited: "Shared files: {used} ({count} files, no limit)",
+    shared_limit_label: "Shared-files storage limit (MB, 0 = unlimited)",
+    shared_hint:
+      "Node-shared files are user content and are never deleted automatically. New uploads are refused once this limit would be exceeded.",
+    shared_limit_saved: "Shared-storage limit saved.",
+    shared_limit_invalid: "Enter a whole number from 0 to 102400.",
+    pages_usage: "Hosted pages: {used} of {limit} ({count} pages)",
+    pages_usage_unlimited: "Hosted pages: {used} ({count} pages, no limit)",
+    pages_limit_label: "Hosted-pages storage limit (MB, 0 = unlimited)",
+    pages_hint:
+      "Hosted pages are user content and are never deleted automatically. New saves are refused once this limit would be exceeded.",
+    pages_limit_saved: "Pages-storage limit saved.",
+    pages_limit_invalid: "Enter a whole number from 0 to 10240.",
+    messages_usage: "Message history: {count} messages",
+    messages_retention_label:
+      "Delete messages older than (days, 0 = keep forever)",
+    messages_retention_warn:
+      "Saving a non-zero retention deletes older messages now and then once a day. Peers and discovered nodes are kept. The database file is not compacted automatically.",
+    messages_saved: "Retention saved — {removed} message(s) removed.",
+    messages_invalid: "Enter a whole number from 0 to 3650.",
+    logs_usage: "Logs: {used} of {limit}",
+    logs_usage_unlimited: "Logs: {used} (no limit)",
+    log_limit_label: "Log limit (MB, 0 = unlimited)",
+    log_limit_hint:
+      "Applied at the next start: an oversized log is renamed to .1 (one backup kept) before Reticulum starts.",
+    log_limit_saved: "Log limit saved — applied at the next start.",
+    log_limit_invalid: "Enter a whole number from 0 to 1024.",
     glossary: "Glossary",
     restart_required: "Restart required for connection changes.",
     footer: "MeshDeck v{version} · uptime {seconds}s",

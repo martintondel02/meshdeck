@@ -31,6 +31,8 @@ export interface ChatMessage {
   fields_json: string | null;
   created_ts: number | null;
   delivered_ts: number | null;
+  /** Inbound only: blob still present per attachment (pruned => tombstone). */
+  attachments_available?: boolean[] | null;
 }
 
 export function attachmentsOf(msg: ChatMessage): AttachmentMeta[] {
@@ -76,6 +78,21 @@ export interface Status {
   propagation_store_bytes: number | null;
   propagation_storage_limit_mb: number;
   propagation_storage_limit_bytes: number;
+  // Phase 7.1 bounded stores (all 0 limits mean unlimited).
+  attachment_bytes: number;
+  attachment_files: number;
+  attachment_storage_max_bytes: number;
+  attachment_retention_days: number;
+  shared_bytes: number;
+  shared_files: number;
+  shared_storage_max_bytes: number;
+  pages_bytes: number;
+  pages_entries: number;
+  pages_storage_max_bytes: number;
+  message_count: number;
+  message_retention_days: number;
+  log_bytes: number;
+  log_max_bytes: number;
 }
 
 export const identity = writable<IdentityInfo | null>(null);

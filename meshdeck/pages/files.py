@@ -21,6 +21,10 @@ class SharedFileError(ValueError):
     pass
 
 
+class SharedStorageFull(SharedFileError):
+    """New write would exceed ``shared_storage_max_mb`` (existing files stay)."""
+
+
 def sanitize_shared_name(name: str) -> str:
     """Return a safe flat filename (no directories, no traversal)."""
     base = name.replace("\\", "/").split("/")[-1].strip()
@@ -31,9 +35,15 @@ def sanitize_shared_name(name: str) -> str:
 
 
 class SharedFiles:
-    def __init__(self, shared_dir: Path) -> None:
+    def __init__(self, shared_dir: Path, max_bytes: int = 0) -> None:
         self.dir = shared_dir
         self.dir.mkdir(parents=True, exist_ok=True)
+        self.max_bytes = max(0, int(max_bytes))
+
+    def set_max_bytes(self, max_bytes: int) -> int:
+        """Change the total cap. Existing oversized stores are left alone."""
+        self.max_bytes = max(0, int(max_bytes))
+        return self.max_bytes
 
     def _resolve(self, name: str) -> Path:
         path = (self.dir / sanitize_shared_name(name)).resolve()
@@ -49,6 +59,12 @@ class SharedFiles:
                 out.append({"name": f.name, "size": st.st_size, "updated": st.st_mtime})
         return out
 
+    def total_bytes(self) -> int:
+        return sum(info["size"] for info in self.list_files())
+
+    def count(self) -> int:
+        return len(self.list_files())
+
     def read(self, name: str) -> bytes | None:
         f = self._resolve(name)
         return f.read_bytes() if f.is_file() else None
@@ -57,6 +73,15 @@ class SharedFiles:
         if len(data) > MAX_SHARED_BYTES:
             raise SharedFileError("file is larger than 32 MiB")
         f = self._resolve(name)
+        if self.max_bytes:
+            used = self.total_bytes()
+            if f.is_file():
+                used -= f.stat().st_size  # an overwrite replaces its own bytes
+            if used + len(data) > self.max_bytes:
+                raise SharedStorageFull(
+                    f"shared storage limit reached ({used + len(data)} > "
+                    f"{self.max_bytes} bytes)"
+                )
         f.write_bytes(data)
         return {"name": f.name, "size": len(data), "saved_ts": time.time()}
 
@@ -64,3 +89,4 @@ class SharedFiles:
         f = self._resolve(name)
         if f.is_file():
             f.unlink()
+

@@ -14,6 +14,10 @@ class PageNameError(ValueError):
     pass
 
 
+class PageStorageFull(PageNameError):
+    """New write would exceed ``pages_storage_max_mb`` (existing pages stay)."""
+
+
 def validate_page_name(name: str) -> str:
     """Return the sanitized relative page name, or raise PageNameError."""
     cleaned = name.strip().lstrip("/")
@@ -25,9 +29,10 @@ def validate_page_name(name: str) -> str:
 
 
 class PageStore:
-    def __init__(self, pages_dir: Path) -> None:
+    def __init__(self, pages_dir: Path, max_bytes: int = 0) -> None:
         self.dir = pages_dir
         self.dir.mkdir(parents=True, exist_ok=True)
+        self.max_bytes = max(0, int(max_bytes))
 
     def _resolve(self, name: str) -> Path:
         rel = validate_page_name(name)
@@ -50,6 +55,17 @@ class PageStore:
                 )
         return result
 
+    def total_bytes(self) -> int:
+        return sum(page["size"] for page in self.list_pages())
+
+    def count(self) -> int:
+        return len(self.list_pages())
+
+    def set_max_bytes(self, max_bytes: int) -> int:
+        """Change the total cap. Existing oversized stores are left alone."""
+        self.max_bytes = max(0, int(max_bytes))
+        return self.max_bytes
+
     def read(self, name: str) -> str:
         f = self._resolve(name)
         if not f.is_file():
@@ -63,9 +79,19 @@ class PageStore:
         return f.read_bytes()
 
     def write(self, name: str, content: str) -> dict[str, Any]:
-        if len(content.encode("utf-8")) > 4 * 1024 * 1024:
+        encoded = content.encode("utf-8")
+        if len(encoded) > 4 * 1024 * 1024:
             raise PageNameError("page is larger than 4 MiB")
         f = self._resolve(name)
+        if self.max_bytes:
+            used = self.total_bytes()
+            if f.is_file():
+                used -= f.stat().st_size  # an overwrite replaces its own bytes
+            if used + len(encoded) > self.max_bytes:
+                raise PageStorageFull(
+                    f"pages storage limit reached ({used + len(encoded)} > "
+                    f"{self.max_bytes} bytes)"
+                )
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text(content, encoding="utf-8")
         return {"name": f.relative_to(self.dir).as_posix(), "saved_ts": time.time()}
@@ -74,3 +100,4 @@ class PageStore:
         f = self._resolve(name)
         if f.is_file():
             f.unlink()
+

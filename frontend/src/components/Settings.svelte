@@ -33,6 +33,151 @@
   let cacheBusy = $state(false);
   let cacheNote = $state("");
 
+  // Phase 7.1: the remaining bounded stores.
+  let pageCacheLimit = $state<number | string>("");
+  let pageCacheNote = $state("");
+  let attachmentLimit = $state<number | string>("");
+  let attachmentDays = $state<number | string>("");
+  let attachmentNote = $state("");
+  let sharedLimit = $state<number | string>("");
+  let sharedNote = $state("");
+  let pagesLimit = $state<number | string>("");
+  let pagesNote = $state("");
+  let messageDays = $state<number | string>("");
+  let messageNote = $state("");
+  let logLimit = $state<number | string>("");
+  let logNote = $state("");
+  let storageBusy = $state(false);
+
+  $effect(() => {
+    const s = $settings ?? {};
+    if (typeof s.page_cache_max_bytes === "number") pageCacheLimit = s.page_cache_max_bytes;
+    if (typeof s.attachment_storage_max_mb === "number") attachmentLimit = s.attachment_storage_max_mb;
+    if (typeof s.attachment_retention_days === "number") attachmentDays = s.attachment_retention_days;
+    if (typeof s.shared_storage_max_mb === "number") sharedLimit = s.shared_storage_max_mb;
+    if (typeof s.pages_storage_max_mb === "number") pagesLimit = s.pages_storage_max_mb;
+    if (typeof s.message_retention_days === "number") messageDays = s.message_retention_days;
+    if (typeof s.log_max_mb === "number") logLimit = s.log_max_mb;
+  });
+
+  function wholeNumber(raw: number | string, min: number, max: number): number | null {
+    const text = String(raw ?? "").trim();
+    const value = Number(text);
+    if (text === "" || !Number.isInteger(value) || value < min || value > max) return null;
+    return value;
+  }
+
+  async function putSettings(payload: Record<string, unknown>) {
+    try {
+      const updated = await api<Record<string, unknown>>("/api/v1/settings", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      settings.set(updated);
+      await refreshStatus();
+      return updated;
+    } catch {
+      return null;
+    }
+  }
+
+  async function savePageCacheLimit() {
+    const value = wholeNumber(pageCacheLimit, 0, 1073741824);
+    if (value === null) {
+      pageCacheNote = t("settings.page_cache_limit_invalid");
+      return;
+    }
+    storageBusy = true;
+    const updated = await putSettings({ page_cache_max_bytes: value });
+    pageCacheNote = updated
+      ? t("settings.page_cache_limit_saved")
+      : t("settings.page_cache_limit_invalid");
+    storageBusy = false;
+  }
+
+  async function saveAttachmentLimits() {
+    const limit = wholeNumber(attachmentLimit, 0, 102400);
+    const days = wholeNumber(attachmentDays, 0, 3650);
+    if (limit === null || days === null) {
+      attachmentNote = t("settings.attachments_invalid");
+      return;
+    }
+    storageBusy = true;
+    const updated = await putSettings({
+      attachment_storage_max_mb: limit,
+      attachment_retention_days: days,
+    });
+    if (!updated) {
+      attachmentNote = t("settings.attachments_invalid");
+    } else {
+      const effects = (updated.effects ?? {}) as Record<string, number>;
+      attachmentNote = t("settings.attachments_saved", {
+        removed: Number(effects.attachment_removed ?? 0),
+        freed: binarySize(Number(effects.attachment_freed_bytes ?? 0)),
+      });
+    }
+    storageBusy = false;
+  }
+
+  async function saveSharedLimit() {
+    const value = wholeNumber(sharedLimit, 0, 102400);
+    if (value === null) {
+      sharedNote = t("settings.shared_limit_invalid");
+      return;
+    }
+    storageBusy = true;
+    const updated = await putSettings({ shared_storage_max_mb: value });
+    sharedNote = updated
+      ? t("settings.shared_limit_saved")
+      : t("settings.shared_limit_invalid");
+    storageBusy = false;
+  }
+
+  async function savePagesLimit() {
+    const value = wholeNumber(pagesLimit, 0, 10240);
+    if (value === null) {
+      pagesNote = t("settings.pages_limit_invalid");
+      return;
+    }
+    storageBusy = true;
+    const updated = await putSettings({ pages_storage_max_mb: value });
+    pagesNote = updated
+      ? t("settings.pages_limit_saved")
+      : t("settings.pages_limit_invalid");
+    storageBusy = false;
+  }
+
+  async function saveMessageRetention() {
+    const days = wholeNumber(messageDays, 0, 3650);
+    if (days === null) {
+      messageNote = t("settings.messages_invalid");
+      return;
+    }
+    storageBusy = true;
+    const updated = await putSettings({ message_retention_days: days });
+    if (!updated) {
+      messageNote = t("settings.messages_invalid");
+    } else {
+      const effects = (updated.effects ?? {}) as Record<string, number>;
+      messageNote = t("settings.messages_saved", {
+        removed: Number(effects.messages_pruned ?? 0),
+      });
+    }
+    storageBusy = false;
+  }
+
+  async function saveLogLimit() {
+    const value = wholeNumber(logLimit, 0, 1024);
+    if (value === null) {
+      logNote = t("settings.log_limit_invalid");
+      return;
+    }
+    storageBusy = true;
+    const updated = await putSettings({ log_max_mb: value });
+    logNote = updated ? t("settings.log_limit_saved") : t("settings.log_limit_invalid");
+    storageBusy = false;
+  }
+
   $effect(() => {
     const value = $settings?.propagation_storage_limit_mb;
     if (typeof value === "number") storageLimit = value;
@@ -505,29 +650,287 @@
   {#if $mode === "advanced"}
     <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4" data-testid="page-cache">
       <h2 class="font-semibold mb-1">{t("settings.storage_section")}</h2>
-      <p class="text-sm" role="status" aria-live="polite">
-        {#if live?.page_cache_max_bytes}
-          {t("settings.page_cache_usage", {
-            used: binarySize(live.page_cache_bytes ?? 0),
-            limit: binarySize(live.page_cache_max_bytes),
-          })}
-        {:else}
-          {t("settings.page_cache_usage_unlimited", {
-            used: binarySize(live?.page_cache_bytes ?? 0),
-          })}
+
+      <!-- Page cache (bounded automatically; safe to clear) -->
+      <div data-testid="page-cache-usage">
+        <p class="text-sm" role="status" aria-live="polite">
+          {#if live?.page_cache_max_bytes}
+            {t("settings.page_cache_usage", {
+              used: binarySize(live.page_cache_bytes ?? 0),
+              limit: binarySize(live.page_cache_max_bytes),
+            })}
+          {:else}
+            {t("settings.page_cache_usage_unlimited", {
+              used: binarySize(live?.page_cache_bytes ?? 0),
+            })}
+          {/if}
+        </p>
+        <label class="block mt-2">
+          <span class="text-sm text-wp-dim">{t("settings.page_cache_limit_label")}</span>
+          <div class="flex gap-2 mt-1">
+            <input
+              type="number"
+              min="0"
+              max="1073741824"
+              step="1"
+              inputmode="numeric"
+              bind:value={pageCacheLimit}
+              class="w-40 bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:border-wp-accent"
+              aria-label={t("settings.page_cache_limit_label")}
+            />
+            <button
+              onclick={savePageCacheLimit}
+              disabled={storageBusy}
+              class="bg-wp-panel2 border border-wp-border rounded-lg px-3 text-sm
+                     hover:border-wp-accent transition disabled:opacity-40"
+              >{t("common.save")}</button
+            >
+          </div>
+        </label>
+        <p class="text-xs text-wp-dim mt-1">{t("settings.page_cache_limit_hint")}</p>
+        {#if pageCacheNote}
+          <p class="text-xs text-wp-accent mt-1" role="status" aria-live="polite">
+            {pageCacheNote}
+          </p>
         {/if}
-      </p>
-      <p class="text-xs text-wp-dim mt-1">{t("settings.page_cache_hint")}</p>
-      <button
-        onclick={clearCache}
-        disabled={cacheBusy}
-        class="mt-3 bg-wp-panel2 border border-wp-border rounded-lg px-4 py-2 text-sm
-               hover:border-wp-accent transition-colors disabled:opacity-40"
-        >{t("settings.clear_cache")}</button
-      >
-      {#if cacheNote}
-        <p class="text-xs text-wp-accent mt-2" role="status" aria-live="polite">{cacheNote}</p>
-      {/if}
+        <button
+          onclick={clearCache}
+          disabled={cacheBusy}
+          class="mt-3 bg-wp-panel2 border border-wp-border rounded-lg px-4 py-2 text-sm
+                 hover:border-wp-accent transition-colors disabled:opacity-40"
+          >{t("settings.clear_cache")}</button
+        >
+        {#if cacheNote}
+          <p class="text-xs text-wp-accent mt-2" role="status" aria-live="polite">{cacheNote}</p>
+        {/if}
+      </div>
+
+      <!-- Chat attachment blobs (pruning keeps the message rows) -->
+      <div class="mt-4 border-t border-wp-border pt-4" data-testid="attachment-storage">
+        <p class="text-sm" role="status" aria-live="polite">
+          {#if live?.attachment_storage_max_bytes}
+            {t("settings.attachments_usage", {
+              used: binarySize(live.attachment_bytes ?? 0),
+              limit: binarySize(live.attachment_storage_max_bytes),
+              count: live.attachment_files ?? 0,
+            })}
+          {:else}
+            {t("settings.attachments_usage_unlimited", {
+              used: binarySize(live?.attachment_bytes ?? 0),
+              count: live?.attachment_files ?? 0,
+            })}
+          {/if}
+        </p>
+        <div class="grid sm:grid-cols-2 gap-3 mt-2">
+          <label class="block">
+            <span class="text-sm text-wp-dim">{t("settings.attachment_limit_label")}</span>
+            <input
+              type="number"
+              min="0"
+              max="102400"
+              step="1"
+              inputmode="numeric"
+              bind:value={attachmentLimit}
+              class="mt-1 w-full bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:border-wp-accent"
+              aria-label={t("settings.attachment_limit_label")}
+            />
+          </label>
+          <label class="block">
+            <span class="text-sm text-wp-dim">{t("settings.attachment_retention_label")}</span>
+            <input
+              type="number"
+              min="0"
+              max="3650"
+              step="1"
+              inputmode="numeric"
+              bind:value={attachmentDays}
+              class="mt-1 w-full bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:border-wp-accent"
+              aria-label={t("settings.attachment_retention_label")}
+            />
+          </label>
+        </div>
+        <p class="text-xs text-wp-warn mt-2">{t("settings.attachment_retention_warn")}</p>
+        <button
+          onclick={saveAttachmentLimits}
+          disabled={storageBusy}
+          class="mt-2 bg-wp-panel2 border border-wp-border rounded-lg px-3 py-1.5 text-sm
+                 hover:border-wp-accent transition disabled:opacity-40"
+          >{t("common.save")}</button
+        >
+        {#if attachmentNote}
+          <p class="text-xs text-wp-accent mt-1" role="status" aria-live="polite">
+            {attachmentNote}
+          </p>
+        {/if}
+      </div>
+
+      <!-- Node-shared files: user content, never auto-deleted -->
+      <div class="mt-4 border-t border-wp-border pt-4" data-testid="shared-storage">
+        <p class="text-sm" role="status" aria-live="polite">
+          {#if live?.shared_storage_max_bytes}
+            {t("settings.shared_usage", {
+              used: binarySize(live.shared_bytes ?? 0),
+              limit: binarySize(live.shared_storage_max_bytes),
+              count: live.shared_files ?? 0,
+            })}
+          {:else}
+            {t("settings.shared_usage_unlimited", {
+              used: binarySize(live?.shared_bytes ?? 0),
+              count: live?.shared_files ?? 0,
+            })}
+          {/if}
+        </p>
+        <label class="block mt-2">
+          <span class="text-sm text-wp-dim">{t("settings.shared_limit_label")}</span>
+          <div class="flex gap-2 mt-1">
+            <input
+              type="number"
+              min="0"
+              max="102400"
+              step="1"
+              inputmode="numeric"
+              bind:value={sharedLimit}
+              class="w-40 bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:border-wp-accent"
+              aria-label={t("settings.shared_limit_label")}
+            />
+            <button
+              onclick={saveSharedLimit}
+              disabled={storageBusy}
+              class="bg-wp-panel2 border border-wp-border rounded-lg px-3 text-sm
+                     hover:border-wp-accent transition disabled:opacity-40"
+              >{t("common.save")}</button
+            >
+          </div>
+        </label>
+        <p class="text-xs text-wp-dim mt-1">{t("settings.shared_hint")}</p>
+        {#if sharedNote}
+          <p class="text-xs text-wp-accent mt-1" role="status" aria-live="polite">{sharedNote}</p>
+        {/if}
+      </div>
+
+      <!-- Hosted pages: user content, never auto-deleted -->
+      <div class="mt-4 border-t border-wp-border pt-4" data-testid="pages-storage">
+        <p class="text-sm" role="status" aria-live="polite">
+          {#if live?.pages_storage_max_bytes}
+            {t("settings.pages_usage", {
+              used: binarySize(live.pages_bytes ?? 0),
+              limit: binarySize(live.pages_storage_max_bytes),
+              count: live.pages_entries ?? 0,
+            })}
+          {:else}
+            {t("settings.pages_usage_unlimited", {
+              used: binarySize(live?.pages_bytes ?? 0),
+              count: live?.pages_entries ?? 0,
+            })}
+          {/if}
+        </p>
+        <label class="block mt-2">
+          <span class="text-sm text-wp-dim">{t("settings.pages_limit_label")}</span>
+          <div class="flex gap-2 mt-1">
+            <input
+              type="number"
+              min="0"
+              max="10240"
+              step="1"
+              inputmode="numeric"
+              bind:value={pagesLimit}
+              class="w-40 bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:border-wp-accent"
+              aria-label={t("settings.pages_limit_label")}
+            />
+            <button
+              onclick={savePagesLimit}
+              disabled={storageBusy}
+              class="bg-wp-panel2 border border-wp-border rounded-lg px-3 text-sm
+                     hover:border-wp-accent transition disabled:opacity-40"
+              >{t("common.save")}</button
+            >
+          </div>
+        </label>
+        <p class="text-xs text-wp-dim mt-1">{t("settings.pages_hint")}</p>
+        {#if pagesNote}
+          <p class="text-xs text-wp-accent mt-1" role="status" aria-live="polite">{pagesNote}</p>
+        {/if}
+      </div>
+
+      <!-- SQLite message history retention -->
+      <div class="mt-4 border-t border-wp-border pt-4" data-testid="message-history">
+        <p class="text-sm" role="status" aria-live="polite">
+          {t("settings.messages_usage", { count: live?.message_count ?? 0 })}
+        </p>
+        <label class="block mt-2">
+          <span class="text-sm text-wp-dim">{t("settings.messages_retention_label")}</span>
+          <div class="flex gap-2 mt-1">
+            <input
+              type="number"
+              min="0"
+              max="3650"
+              step="1"
+              inputmode="numeric"
+              bind:value={messageDays}
+              class="w-32 bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:border-wp-accent"
+              aria-label={t("settings.messages_retention_label")}
+            />
+            <button
+              onclick={saveMessageRetention}
+              disabled={storageBusy}
+              class="bg-wp-panel2 border border-wp-border rounded-lg px-3 text-sm
+                     hover:border-wp-accent transition disabled:opacity-40"
+              >{t("common.save")}</button
+            >
+          </div>
+        </label>
+        <p class="text-xs text-wp-warn mt-1">{t("settings.messages_retention_warn")}</p>
+        {#if messageNote}
+          <p class="text-xs text-wp-accent mt-1" role="status" aria-live="polite">{messageNote}</p>
+        {/if}
+      </div>
+
+      <!-- MeshDeck/Reticulum logs (rotated at startup) -->
+      <div class="mt-4 border-t border-wp-border pt-4" data-testid="log-storage">
+        <p class="text-sm" role="status" aria-live="polite">
+          {#if live?.log_max_bytes}
+            {t("settings.logs_usage", {
+              used: binarySize(live.log_bytes ?? 0),
+              limit: binarySize(live.log_max_bytes),
+            })}
+          {:else}
+            {t("settings.logs_usage_unlimited", { used: binarySize(live?.log_bytes ?? 0) })}
+          {/if}
+        </p>
+        <label class="block mt-2">
+          <span class="text-sm text-wp-dim">{t("settings.log_limit_label")}</span>
+          <div class="flex gap-2 mt-1">
+            <input
+              type="number"
+              min="0"
+              max="1024"
+              step="1"
+              inputmode="numeric"
+              bind:value={logLimit}
+              class="w-32 bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:border-wp-accent"
+              aria-label={t("settings.log_limit_label")}
+            />
+            <button
+              onclick={saveLogLimit}
+              disabled={storageBusy}
+              class="bg-wp-panel2 border border-wp-border rounded-lg px-3 text-sm
+                     hover:border-wp-accent transition disabled:opacity-40"
+              >{t("common.save")}</button
+            >
+          </div>
+        </label>
+        <p class="text-xs text-wp-dim mt-1">{t("settings.log_limit_hint")}</p>
+        {#if logNote}
+          <p class="text-xs text-wp-accent mt-1" role="status" aria-live="polite">{logNote}</p>
+        {/if}
+      </div>
     </section>
   {/if}
 

@@ -21,6 +21,7 @@ from meshdeck.config import (
 )
 from meshdeck.core.service import CoreService
 from meshdeck.rns.stack import InvalidConfigError
+from meshdeck.util.logs import prepare_logging
 
 log = logging.getLogger("meshdeck")
 
@@ -108,10 +109,25 @@ async def amain(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # Rotate our own oversized logs before anything (including RNS) opens them.
+    # Only logs/ inside the data dir is touched; log_max_mb is read from the
+    # settings table if it already exists.
+    log_path: Path | None = None
+    try:
+        log_path = prepare_logging(AppPaths(data_dir=args.data_dir or default_data_dir()))
+    except OSError:
+        log_path = None
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if log_path is not None:
+        try:
+            handlers.append(logging.FileHandler(log_path, encoding="utf-8"))
+        except OSError:
+            pass
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname).1s %(name)s: %(message)s",
         datefmt="%H:%M:%S",
+        handlers=handlers,
     )
     try:
         return asyncio.run(amain(args))

@@ -73,3 +73,30 @@ def list_messages(
             (peer_hash, limit),
         )
     return [dict(r) for r in rows]
+
+
+def count_messages(db: Database) -> int:
+    row = db.execute("SELECT COUNT(*) AS n FROM messages")
+    return int(row["n"] or 0) if row is not None else 0
+
+
+def prune_older_than(db: Database, cutoff_ts: float) -> int:
+    """Delete messages created before *cutoff_ts*; peers/nodes are untouched.
+
+    Returns the number of rows removed. No VACUUM: the file does not shrink
+    immediately, but SQLite reuses the freed pages, and a blocking VACUUM on a
+    large history is not cheap enough to run automatically. Documented in the
+    storage handoff; compaction stays an explicit operator action.
+    """
+    row = db.execute(
+        "SELECT COUNT(*) AS n FROM messages WHERE created_ts IS NOT NULL AND created_ts < ?",
+        (cutoff_ts,),
+    )
+    removed = int(row["n"] or 0) if row is not None else 0
+    if removed:
+        db.execute(
+            "DELETE FROM messages WHERE created_ts IS NOT NULL AND created_ts < ?",
+            (cutoff_ts,),
+        )
+    return removed
+

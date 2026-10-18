@@ -76,10 +76,15 @@ class PageHost:
         identity_manager: IdentityManager,
         bus: EventBus,
         shared_dir: Path | None = None,
+        pages_max_bytes: int = 0,
+        shared_max_bytes: int = 0,
     ) -> None:
-        self.store = PageStore(pages_dir)
+        self.store = PageStore(pages_dir, max_bytes=pages_max_bytes)
         default_shared = pages_dir.parent / "shared"
-        self.files = SharedFiles(shared_dir if shared_dir is not None else default_shared)
+        self.files = SharedFiles(
+            shared_dir if shared_dir is not None else default_shared,
+            max_bytes=shared_max_bytes,
+        )
         self._identity_manager = identity_manager
         self._bus = bus
         self._destination: RNS.Destination | None = None

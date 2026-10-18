@@ -15,6 +15,7 @@ import RNS
 
 from meshdeck.core.events import EventBus
 from meshdeck.rns.identity import IdentityManager
+from meshdeck.storage.attachments import prune_attachments
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +31,9 @@ ROUTER_DELIVERY_LIMIT_KB = 2048  # inbound direct-transfer cap: 2,048,000 bytes
 # Default LXMF propagation message-store cap, in MB (LXMF's own unit: the
 # setter multiplies megabytes by 1,000,000). 0 would mean "unlimited".
 DEFAULT_PROPAGATION_STORAGE_LIMIT_MB = 256
+# Phase 7.1 attachment blob bound (binary MiB; 0 = unlimited) and age policy.
+DEFAULT_ATTACHMENT_STORAGE_MAX_MB = 512
+DEFAULT_ATTACHMENT_RETENTION_DAYS = 0
 
 _METHODS = {
     "direct": LXMF.LXMessage.DIRECT,
@@ -83,6 +87,8 @@ class ChatRouter:
         propagation_node_hash: str = "",
         host_propagation_node: bool = False,
         propagation_storage_limit_mb: int = DEFAULT_PROPAGATION_STORAGE_LIMIT_MB,
+        attachment_storage_max_mb: int = DEFAULT_ATTACHMENT_STORAGE_MAX_MB,
+        attachment_retention_days: int = DEFAULT_ATTACHMENT_RETENTION_DAYS,
     ) -> None:
         self._lxmf_dir = lxmf_dir
         self._files_dir = files_dir
@@ -93,6 +99,8 @@ class ChatRouter:
         self._propagation_node_hash = propagation_node_hash
         self._host_propagation_node = bool(host_propagation_node)
         self._propagation_storage_limit_mb = max(0, int(propagation_storage_limit_mb))
+        self._attachment_storage_max_mb = max(0, int(attachment_storage_max_mb))
+        self._attachment_retention_days = max(0, int(attachment_retention_days))
         self._router: LXMF.LXMRouter | None = None
         self._delivery_destination: RNS.Destination | None = None
         self._pending: dict[str, LXMF.LXMessage] = {}  # outbound, hash_hex -> lxm
@@ -249,6 +257,32 @@ class ChatRouter:
             return None
         return None if size is None else int(size)
 
+    # -- attachment blobs (disk usage) ----------------------------------------
+
+    def set_attachment_limits(self, max_mb: int, retention_days: int) -> dict[str, int]:
+        """Live-apply the attachment blob cap/retention (message rows untouched)."""
+        self._attachment_storage_max_mb = max(0, int(max_mb))
+        self._attachment_retention_days = max(0, int(retention_days))
+        return {
+            "attachment_storage_max_mb": self._attachment_storage_max_mb,
+            "attachment_retention_days": self._attachment_retention_days,
+        }
+
+    def prune_attachments(self) -> dict[str, int]:
+        """Apply the configured attachment policy to the blob store.
+
+        Safe from RNS threads: it only touches files under ``files_dir`` (never
+        asyncio, HTTP or SQLite). Message rows keep their metadata."""
+        return prune_attachments(
+            self._files_dir,
+            max_bytes=self._attachment_storage_max_mb * 1024 * 1024,
+            retention_days=self._attachment_retention_days,
+        )
+
+    def attachment_exists(self, peer_hash_hex: str, msg_hash_hex: str, index: int) -> bool:
+        directory = self._files_dir / peer_hash_hex / msg_hash_hex
+        return any(directory.glob(f"{index}_*"))
+
     def sync_from_propagation_node(self) -> bool:
         """Ask the configured propagation node for our stored messages."""
         if not self._propagation_node_hash or self._router is None:
@@ -385,6 +419,19 @@ class ChatRouter:
     def _on_inbound(self, lxm: LXMF.LXMessage) -> None:
         try:
             attachments = self._save_attachments(lxm)
+            # Bound the blob store right after every inbound attachment. This
+            # is file-only work on an RNS thread: no asyncio, HTTP or SQLite.
+            pruned = self.prune_attachments()
+            if pruned["attachment_removed"]:
+                log.info(
+                    "attachment prune removed %s blob(s), freed %s bytes",
+                    pruned["attachment_removed"],
+                    pruned["attachment_freed_bytes"],
+                )
+            available = [
+                self.attachment_exists(lxm.source_hash.hex(), lxm.hash.hex(), meta["index"])
+                for meta in attachments
+            ]
             self._bus.publish_from_thread(
                 "message_received",
                 {
@@ -395,6 +442,7 @@ class ChatRouter:
                     "ts": getattr(lxm, "timestamp", None) or time.time(),
                     "signature_valid": bool(getattr(lxm, "signature_validated", False)),
                     "attachments": attachments,
+                    "attachments_available": available,
                 },
             )
         except Exception:  # noqa: BLE001

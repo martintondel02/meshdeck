@@ -254,21 +254,37 @@
               <p class="whitespace-pre-wrap break-words">{msg.content}</p>
             {/if}
             {#each attachmentsOf(msg) as att (att.index)}
-              <a
-                href="{attachmentUrl(peer.hash, msg, att.index)}?token={getToken()}"
-                class="flex items-center gap-2 mt-1.5 px-3 py-2 rounded-lg bg-wp-bg/60
-                       border border-wp-border hover:border-wp-accent transition-colors group"
-                title={t("chats.download_title", { name: att.name })}
-              >
-                <span class="text-base" aria-hidden="true">📎</span>
-                <span class="sr-only">{t("chats.download_attachment")} </span>
-                <span class="truncate font-mono text-xs">{att.name}</span>
-                <span class="text-[11px] text-wp-dim shrink-0">{humanSize(att.size)}</span>
-                <span
-                  class="text-wp-accent opacity-0 group-hover:opacity-100 transition shrink-0"
-                  aria-hidden="true">⬇</span
+              {#if msg.attachments_available?.[att.index] === false}
+                <!-- Blob removed by the configured retention policy: keep the
+                     metadata visible, but do not offer a broken download. -->
+                <div
+                  class="flex items-center gap-2 mt-1.5 px-3 py-2 rounded-lg bg-wp-bg/30
+                         border border-dashed border-wp-border text-wp-dim"
+                  title={t("chats.attachment_pruned")}
                 >
-              </a>
+                  <span class="text-base" aria-hidden="true">📎</span>
+                  <span class="sr-only">{t("chats.attachment_pruned")} </span>
+                  <span class="truncate font-mono text-xs">{att.name}</span>
+                  <span class="text-[11px] shrink-0">{humanSize(att.size)}</span>
+                  <span class="text-[11px] italic shrink-0">{t("chats.attachment_pruned")}</span>
+                </div>
+              {:else}
+                <a
+                  href="{attachmentUrl(peer.hash, msg, att.index)}?token={getToken()}"
+                  class="flex items-center gap-2 mt-1.5 px-3 py-2 rounded-lg bg-wp-bg/60
+                         border border-wp-border hover:border-wp-accent transition-colors group"
+                  title={t("chats.download_title", { name: att.name })}
+                >
+                  <span class="text-base" aria-hidden="true">📎</span>
+                  <span class="sr-only">{t("chats.download_attachment")} </span>
+                  <span class="truncate font-mono text-xs">{att.name}</span>
+                  <span class="text-[11px] text-wp-dim shrink-0">{humanSize(att.size)}</span>
+                  <span
+                    class="text-wp-accent opacity-0 group-hover:opacity-100 transition shrink-0"
+                    aria-hidden="true">⬇</span
+                  >
+                </a>
+              {/if}
             {/each}
             <div class="flex items-center gap-1.5 justify-end mt-1 text-[11px] text-wp-dim">
               <span>{clockTime(msg.created_ts)}</span>
