@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [svelte(), tailwindcss()],
   server: {
-    // dev flow: `pnpm dev` here + `python -m waypoint` in the repo root.
+    // dev flow: `pnpm dev` here + `python -m meshdeck` in the repo root.
     // The token query param is forwarded to the backend unchanged.
     proxy: {
       "/api": { target: "http://127.0.0.1:8570", changeOrigin: true },

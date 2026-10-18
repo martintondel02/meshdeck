@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PyInstaller entry shim: python -m waypoint as an importable main().
+"""PyInstaller entry shim: python -m meshdeck as an importable main().
 
 Packaging shim note: RNS.Reticulum populates its module namespace with the
 interface modules via `from RNS.Interfaces import *`. A star-import on a
@@ -55,7 +55,7 @@ def _bind_rns_interfaces() -> None:
 
 _bind_rns_interfaces()
 
-from waypoint.__main__ import main  # noqa: E402
+from meshdeck.__main__ import main  # noqa: E402
 
 if __name__ == "__main__":
     sys.exit(main())

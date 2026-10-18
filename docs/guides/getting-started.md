@@ -1,16 +1,16 @@
-# Getting started with Waypoint
+# Getting started with MeshDeck
 
 > This guide ships inside the app (Help section) and lives in the repo at
 > `docs/guides/`. Keep both audiences in mind when editing.
 
 ## The 60-second version
 
-1. Start Waypoint. On first run it creates your **identity** — a cryptographic
+1. Start MeshDeck. On first run it creates your **identity** — a cryptographic
    keypair that *is* your presence on the network. No signup, no server
    account.
 2. Pick a **display name**. Others see it next to your address.
-3. Share your **address** (top bar) with a friend who runs Waypoint, MeshChat,
-   or Sideband — or run a second Waypoint on your machine/network for a
+3. Share your **address** (top bar) with a friend who runs MeshDeck, MeshChat,
+   or Sideband — or run a second MeshDeck on your machine/network for a
    self-test.
 4. When you see them appear under **Peers**, click and say hi.
 

@@ -9,7 +9,7 @@ from typing import Any
 import RNS
 from RNS.vendor.configobj import ConfigObj
 
-from waypoint.rns.config_gen import render_config
+from meshdeck.rns.config_gen import render_config
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class InvalidConfigError(ValueError):
     """
 
 
-# Interface types where Waypoint checks for the keys they require to start.
+# Interface types where MeshDeck checks for the keys they require to start.
 _LISTENER_TYPES = {"TCPServerInterface", "BackboneInterface"}
 _CLIENT_TYPES = {"TCPClientInterface", "BackboneClientInterface"}
 

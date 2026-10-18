@@ -106,10 +106,10 @@
     <div class="p-4 text-sm text-wp-dim leading-relaxed">
       <p class="mb-2">No peers discovered yet.</p>
       <p class="mb-2">
-        Waypoint finds people automatically when they
+        MeshDeck finds people automatically when they
         <em>announce</em>
         <Tooltip text={TOOLTIPS.announce} />
-        themselves. Share your address (top bar) with a friend running Waypoint,
+        themselves. Share your address (top bar) with a friend running MeshDeck,
         MeshChat, or Sideband to get started — or press ＋ to add someone directly.
       </p>
     </div>

@@ -108,7 +108,7 @@
 <div class="space-y-3">
   {#if entries.length === 0}
     <p class="text-sm text-wp-dim">
-      No manual interfaces yet — Waypoint is using its automatic setup
+      No manual interfaces yet — MeshDeck is using its automatic setup
       (LAN discovery{#if Number($settings?.connect_autointerface) === 0}&nbsp;off{/if}).
       Add entries below to take full control, or paste a snippet from
       <a class="text-wp-accent hover:underline" href="https://directory.rns.recipes/" target="_blank" rel="noreferrer">directory.rns.recipes</a>

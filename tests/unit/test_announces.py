@@ -2,7 +2,7 @@
 
 import msgpack
 
-from waypoint.chat.peers import decode_lxmf_announce
+from meshdeck.chat.peers import decode_lxmf_announce
 
 
 def test_decode_standard_msgpack_announce():

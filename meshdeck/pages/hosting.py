@@ -1,6 +1,6 @@
 """NomadNet-compatible page hosting node.
 
-Serves micron (`.mu`) pages from the Waypoint pages directory over RNS Links,
+Serves micron (`.mu`) pages from the MeshDeck pages directory over RNS Links,
 exactly like a reference NomadNet node does: destination
 ("nomadnetwork", "node") + registered request handlers `/page/<path>.mu` +
 "/media" placeholder. Announces carry the plain node-name bytes.
@@ -15,18 +15,18 @@ from typing import Any
 
 import RNS
 
-from waypoint.core.events import EventBus
-from waypoint.pages.storage import PageNameError, PageStore
-from waypoint.rns.identity import IdentityManager
+from meshdeck.core.events import EventBus
+from meshdeck.pages.storage import PageNameError, PageStore
+from meshdeck.rns.identity import IdentityManager
 
 log = logging.getLogger(__name__)
 
 NODE_ASPECT = "nomadnetwork.node"  # announce aspect filter (dotted)
 REQUEST_PREFIX = "/page/"
 
-default_index = """>{} — Waypoint Node
+default_index = """>{} — MeshDeck Node
 
-This node serves pages hosted by Waypoint.
+This node serves pages hosted by MeshDeck.
 
 If you are the node operator: edit `index.mu` in the app's Pages view
 to replace this placeholder with your own home page.
@@ -92,7 +92,7 @@ class PageHost:
             RNS.Destination.SINGLE,
             *NODE_ASPECT.split("."),
         )
-        self.node_name = node_name or "Waypoint Node"
+        self.node_name = node_name or "MeshDeck Node"
         self.register_all_pages()
         log.info(
             "Page hosting destination ready at %s",
@@ -106,11 +106,11 @@ class PageHost:
 
     def announce(self) -> None:
         assert self._destination is not None
-        self._destination.announce(app_data=(self.node_name or "Waypoint Node").encode())
+        self._destination.announce(app_data=(self.node_name or "MeshDeck Node").encode())
         log.info("Announced nomadnetwork.node destination (%s)", self.node_name)
 
     def set_node_name(self, name: str) -> None:
-        self.node_name = name.strip() or "Waypoint Node"
+        self.node_name = name.strip() or "MeshDeck Node"
 
     # -- page serving ----------------------------------------------------------
 

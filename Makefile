@@ -22,22 +22,22 @@ test-integration: ## full integration tests (spawns real RNS nodes; takes minute
 	$(PY) -m pytest tests/integration -m integration -q
 
 lint: ## ruff + svelte-check
-	$(VENV)/bin/ruff check waypoint tests
+	$(VENV)/bin/ruff check meshdeck tests
 	cd frontend && pnpm run check
 
 check: test lint ## everything CI runs
 
 run: ## start the daemon + web UI (dev)
-	$(PY) -m waypoint --verbose
+	$(PY) -m meshdeck --verbose
 
 dev: build-frontend run ## build UI then start
 
 package: build-frontend ## one-file binary with embedded UI (PyInstaller)
 	$(PIP) install --quiet pyinstaller
-	$(VENV)/bin/pyinstaller packaging/waypoint.spec --distpath dist --workpath build --noconfirm
+	$(VENV)/bin/pyinstaller packaging/meshdeck.spec --distpath dist --workpath build --noconfirm
 	@echo ""
-	@echo "Binary: dist/waypoint   (serve it, run: ./dist/waypoint)"
+	@echo "Binary: dist/meshdeck   (serve it, run: ./dist/meshdeck)"
 
 clean:
-	rm -rf frontend/node_modules frontend/dist .pytest_cache .ruff_cache build dist waypoint.spec.bak
+	rm -rf frontend/node_modules frontend/dist .pytest_cache .ruff_cache build dist meshdeck.spec.bak
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

@@ -2,10 +2,10 @@
 
 import time
 
-from waypoint.storage import messages as msg_repo
-from waypoint.storage import nodes as node_repo
-from waypoint.storage import peers as peer_repo
-from waypoint.storage.db import Database
+from meshdeck.storage import messages as msg_repo
+from meshdeck.storage import nodes as node_repo
+from meshdeck.storage import peers as peer_repo
+from meshdeck.storage.db import Database
 
 
 def test_migrate_creates_schema(tmp_path):

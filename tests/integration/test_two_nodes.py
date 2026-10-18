@@ -183,9 +183,9 @@ def test_two_nodes_discover_and_chat(tmp_path):
     assert result_b["ok"] and result_b["delivered"]
 
     # The peers learned about each other and persisted to the DB.
-    from waypoint.config import AppPaths
-    from waypoint.storage.db import Database
-    from waypoint.storage.peers import list_peers
+    from meshdeck.config import AppPaths
+    from meshdeck.storage.db import Database
+    from meshdeck.storage.peers import list_peers
 
     db = Database(AppPaths(data_dir=dir_a).db_path)
     db.open()

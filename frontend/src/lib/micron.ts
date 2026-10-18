@@ -1,4 +1,4 @@
-// Minimal micron renderer for Waypoint previews and node browsing.
+// Minimal micron renderer for MeshDeck previews and node browsing.
 // Micron (from NomadNet): `>`/`>>`/`>>>` headings, `` `= `` code fences,
 // `*bold*`/`!bold!` toggles, `_underline_`, `[label`target`params]` links,
 // `-` horizontal rules, `•` bullets, inline tokens `Fxxx`/`Bxxx` (colors),

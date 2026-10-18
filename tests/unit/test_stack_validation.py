@@ -2,9 +2,9 @@
 
 import pytest
 
-from waypoint.config import DEFAULT_SETTINGS
-from waypoint.rns.config_gen import render_config
-from waypoint.rns.stack import InvalidConfigError, validate_interface_config
+from meshdeck.config import DEFAULT_SETTINGS
+from meshdeck.rns.config_gen import render_config
+from meshdeck.rns.stack import InvalidConfigError, validate_interface_config
 
 
 def _write(tmp_path, settings) -> object:

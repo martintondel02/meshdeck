@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from waypoint.storage.db import Database
+from meshdeck.storage.db import Database
 
 
 def upsert_node(db: Database, node_hash: str, name: str | None) -> None:

@@ -1,4 +1,4 @@
-# PyInstaller spec for a one-file Waypoint binary.
+# PyInstaller spec for a one-file MeshDeck binary.
 # Build with: make package   (frontend/dist must be built first)
 
 import pathlib
@@ -29,7 +29,7 @@ RNS_IFACE_MODULES = [
 ]
 
 a = Analysis(
-    [str(ROOT / "packaging" / "waypoint_main.py")],
+    [str(ROOT / "packaging" / "meshdeck_main.py")],
     pathex=[str(ROOT)],
     binaries=[],
     datas=[
@@ -59,7 +59,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name="waypoint",
+    name="meshdeck",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

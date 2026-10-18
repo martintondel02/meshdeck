@@ -11,7 +11,7 @@ from typing import Any
 
 from platformdirs import user_data_dir
 
-APP_NAME = "waypoint"
+APP_NAME = "meshdeck"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8570
 
@@ -49,13 +49,13 @@ def default_data_dir() -> Path:
 
 @dataclass
 class AppPaths:
-    """All on-disk locations Waypoint uses. Owns its data dir; never touches ~/.reticulum."""
+    """All on-disk locations MeshDeck uses. Owns its data dir; never touches ~/.reticulum."""
 
     data_dir: Path
 
     @property
     def db_path(self) -> Path:
-        return self.data_dir / "waypoint.db"
+        return self.data_dir / "meshdeck.db"
 
     @property
     def token_path(self) -> Path:

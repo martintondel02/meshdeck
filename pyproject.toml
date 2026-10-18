@@ -3,12 +3,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "waypoint"
+name = "meshdeck"
 version = "0.1.0.dev0"
 description = "An all-in-one Reticulum application: chat, files, pages and infrastructure with basic and advanced modes"
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "Waypoint contributors" }]
+authors = [{ name = "MeshDeck contributors" }]
 requires-python = ">=3.11"
 keywords = ["reticulum", "lxmf", "rns", "mesh", "chat"]
 classifiers = [
@@ -34,13 +34,13 @@ dev = [
 ]
 
 [project.scripts]
-waypoint = "waypoint.__main__:main"
+meshdeck = "meshdeck.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/TBD/waypoint"
+Homepage = "https://github.com/martintondel02/meshdeck"
 
 [tool.hatch.build.targets.wheel]
-packages = ["waypoint"]
+packages = ["meshdeck"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -12,8 +12,8 @@ build/
 node_modules/
 frontend/dist/
 
-# Waypoint runtime data (never commit)
-waypoint-data/
+# MeshDeck runtime data (never commit)
+meshdeck-data/
 **/data/
 *.db
 *.db-wal

@@ -11,16 +11,16 @@
     {
       title: "Getting started",
       body: [
-        "Waypoint creates a Reticulum identity for you on first start. Your 32-character address (Settings → Your address) is what friends use to reach you — it never changes, even if your network does.",
+        "MeshDeck creates a Reticulum identity for you on first start. Your 32-character address (Settings → Your address) is what friends use to reach you — it never changes, even if your network does.",
         "Tell friends your address. When they announce, they appear in your Peers list automatically and stay there forever.",
-        "If you both run Waypoint (or MeshChat, or Sideband) on the same local network, discovery is automatic thanks to the LAN interface.",
+        "If you both run MeshDeck (or MeshChat, or Sideband) on the same local network, discovery is automatic thanks to the LAN interface.",
       ],
     },
     {
       title: "Messaging",
       body: [
         "Type and press Enter. The tick icons tell you the delivery state: … = sending, ✓ = left your node, ✓✓ = the peer's node confirmed delivery, ✗ = failed.",
-        "Nothing routes through Waypoint servers. Your message travels via whatever Reticulum interfaces are available on both sides — LAN, internet entrypoints, LoRa, anything.",
+        "Nothing routes through MeshDeck servers. Your message travels via whatever Reticulum interfaces are available on both sides — LAN, internet entrypoints, LoRa, anything.",
       ],
     },
     {
@@ -28,13 +28,13 @@
       body: [
         "Open a chat and press the 📎 paperclip. Files up to about 1.5 MB (per message) travel inside the LXMF message itself — encrypted and signed exactly like chat text.",
         "Delivery may take a little longer than plain text, and the tick icons work the same way.",
-        "Received files appear as download chips inside the bubble. Waypoint stores them in its data directory under files/<peer>/<message>/.",
+        "Received files appear as download chips inside the bubble. MeshDeck stores them in its data directory under files/<peer>/<message>/.",
       ],
     },
     {
       title: "Adding someone directly",
       body: [
-        "If you know a friend's address, press ＋ in the Peers panel and paste it. Waypoint asks the network for a path to them.",
+        "If you know a friend's address, press ＋ in the Peers panel and paste it. MeshDeck asks the network for a path to them.",
         "The first message you send might show “no path yet” — that's normal. It resolves automatically, usually within a minute, once the peer announces.",
       ],
     },
@@ -48,7 +48,7 @@
     {
       title: "Hosting pages",
       body: [
-        "Waypoint can host NomadNet-compatible pages right from your node — think a tiny encrypted web-site that needs no server, no DNS, and works over any transport Reticulum supports.",
+        "MeshDeck can host NomadNet-compatible pages right from your node — think a tiny encrypted web-site that needs no server, no DNS, and works over any transport Reticulum supports.",
         "Pages tab → create index.mu, write in micron markup (> heading, `*bold`*, • bullets, [label`/page/other.mu] links). Pages are live the moment you save.",
         "Switch on Announce my node to make your node discoverable, or share the node address directly with friends.",
       ],
@@ -57,7 +57,7 @@
       title: "Browsing nodes",
       body: [
         "In Pages → Browse other nodes, discovered nodes appear as chips. Or paste any node address and press Open — the page comes over an encrypted, resumable link.",
-        "Anything another NomadNet or Sideband node hosts, Waypoint can browse. Everything Waypoint hosts, they can browse too.",
+        "Anything another NomadNet or Sideband node hosts, MeshDeck can browse. Everything MeshDeck hosts, they can browse too.",
       ],
     },
   ];

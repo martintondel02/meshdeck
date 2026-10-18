@@ -1,4 +1,4 @@
-"""CLI entry point: python -m waypoint / `waypoint`."""
+"""CLI entry point: python -m meshdeck / `meshdeck`."""
 
 from __future__ import annotations
 
@@ -10,27 +10,27 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from waypoint import __version__
-from waypoint.api.server import ApiServer
-from waypoint.config import (
+from meshdeck import __version__
+from meshdeck.api.server import ApiServer
+from meshdeck.config import (
     DEFAULT_HOST,
     DEFAULT_PORT,
     AppPaths,
     default_data_dir,
     load_or_create_token,
 )
-from waypoint.core.service import CoreService
-from waypoint.rns.stack import InvalidConfigError
+from meshdeck.core.service import CoreService
+from meshdeck.rns.stack import InvalidConfigError
 
-log = logging.getLogger("waypoint")
+log = logging.getLogger("meshdeck")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="waypoint",
-        description="Waypoint — an all-in-one Reticulum application (chat, files, pages, hosting).",
+        prog="meshdeck",
+        description="MeshDeck — an all-in-one Reticulum application (chat, files, pages, hosting).",
     )
-    parser.add_argument("--version", action="version", version=f"waypoint {__version__}")
+    parser.add_argument("--version", action="version", version=f"meshdeck {__version__}")
     parser.add_argument("--data-dir", type=Path, default=None,
                         help="override the data directory (default: platform user data dir)")
     parser.add_argument("--host", default=DEFAULT_HOST, help=f"bind host (default {DEFAULT_HOST})")
@@ -51,7 +51,7 @@ def resolve_static_dir() -> Path | None:
     ):
         if candidate and candidate.exists():
             return candidate
-    # Repo layout: <repo>/waypoint/__main__.py -> <repo>/frontend/dist
+    # Repo layout: <repo>/meshdeck/__main__.py -> <repo>/frontend/dist
     repo_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     if repo_dist.exists():
         return repo_dist
@@ -76,7 +76,7 @@ async def amain(args: argparse.Namespace) -> int:
     port = await server.start(args.host, args.port)
     url = f"http://{args.host}:{port}/?token={token}"
 
-    print(f"Waypoint {__version__} (data: {paths.data_dir})")
+    print(f"MeshDeck {__version__} (data: {paths.data_dir})")
     print(f"Web UI:  {url}")
     print(f"API:     http://{args.host}:{port}/api/v1/status (Bearer token)")
     if args.open_browser:
@@ -90,7 +90,7 @@ async def amain(args: argparse.Namespace) -> int:
         log.info("restart requested — stopping and re-executing process")
         await server.stop()
         await service.stop()
-        argv = [sys.executable, "-m", "waypoint", "--data-dir", str(paths.data_dir),
+        argv = [sys.executable, "-m", "meshdeck", "--data-dir", str(paths.data_dir),
                 "--host", args.host, "--port", str(port)]
         if args.verbose:
             argv.append("-v")

@@ -3,7 +3,7 @@
 import asyncio
 import threading
 
-from waypoint.core.events import EventBus
+from meshdeck.core.events import EventBus
 
 
 async def test_events_delivered_in_order():

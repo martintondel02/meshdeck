@@ -3,8 +3,8 @@
 import os
 import stat
 
-from waypoint.config import load_or_create_token
-from waypoint.util.hexid import is_valid_hash_hex, short
+from meshdeck.config import load_or_create_token
+from meshdeck.util.hexid import is_valid_hash_hex, short
 
 
 def test_token_created_then_stable(tmp_path):

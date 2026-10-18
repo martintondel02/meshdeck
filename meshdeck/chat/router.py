@@ -13,14 +13,14 @@ from typing import Any
 import LXMF
 import RNS
 
-from waypoint.core.events import EventBus
-from waypoint.rns.identity import IdentityManager
+from meshdeck.core.events import EventBus
+from meshdeck.rns.identity import IdentityManager
 
 log = logging.getLogger(__name__)
 
 # Content size cap for plain DIRECT messages (bytes, post-encode).
 MAX_CONTENT_BYTES = 64 * 1024
-# Total attachment bytes per message in the current phase. Waypoint nodes
+# Total attachment bytes per message in the current phase. MeshDeck nodes
 # accept inbound transfers up to ROUTER_DELIVERY_LIMIT kilobytes; other LXMF
 # clients typically cap at 1 MB, so oversize sends to them may fail cleanly
 # (message state -> failed, shown in the UI with an explanation).
@@ -245,7 +245,7 @@ class ChatRouter:
         except Exception:  # noqa: BLE001 - e.g. stamp policy issues
             log.exception("failed to pack outgoing message")
             raise MessageTooLargeError("could not pack message") from None
-        lxm.waypoint_attachments = attachments_meta  # type: ignore[attr-defined]
+        lxm.meshdeck_attachments = attachments_meta  # type: ignore[attr-defined]
         self._pending[lxm.hash.hex()] = lxm
         try:
             self._router.handle_outbound(lxm)
@@ -258,7 +258,7 @@ class ChatRouter:
 
     @staticmethod
     def attachments_of(msg_hash_hex: str, lxm_or_meta: Any) -> list[dict[str, Any]]:
-        return getattr(lxm_or_meta, "waypoint_attachments", None) or []
+        return getattr(lxm_or_meta, "meshdeck_attachments", None) or []
 
     def poll_pending_states(self) -> list[tuple[str, int]]:
         """Return (hash_hex, state) for pending outbound messages whose state

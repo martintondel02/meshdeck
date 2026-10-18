@@ -37,7 +37,7 @@
     captureTokenFromUrl();
     if (!getToken()) {
       bootError =
-        "No API token found. Start Waypoint from the terminal and open the full URL it prints (it contains ?token=…).";
+        "No API token found. Start MeshDeck from the terminal and open the full URL it prints (it contains ?token=…).";
       booted = true;
       return;
     }
@@ -57,8 +57,8 @@
     } catch (e) {
       bootError =
         e instanceof Error && e.message === "unauthorized"
-          ? "The daemon rejected the token. Re-open the exact URL Waypoint printed."
-          : "Could not reach the Waypoint daemon. Is it running?";
+          ? "The daemon rejected the token. Re-open the exact URL MeshDeck printed."
+          : "Could not reach the MeshDeck daemon. Is it running?";
     }
     booted = true;
   });
@@ -93,7 +93,7 @@
       class="flex items-center gap-3 px-4 py-2.5 border-b border-wp-border bg-wp-panel shrink-0"
     >
       <span class="text-lg">🧭</span>
-      <span class="font-bold tracking-tight">Waypoint</span>
+      <span class="font-bold tracking-tight">MeshDeck</span>
       <span
         class="w-2 h-2 rounded-full {$connected ? 'bg-wp-accent' : 'bg-wp-danger'}"
         title={$connected ? 'connected to daemon' : 'daemon connection lost — retrying'}

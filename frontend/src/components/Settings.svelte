@@ -294,6 +294,6 @@
   {/if}
 
   <p class="text-xs text-wp-dim mt-6">
-    Waypoint v{$status?.version ?? "…"} · uptime {$status ? Math.round($status.uptime_seconds) : 0}s
+    MeshDeck v{$status?.version ?? "…"} · uptime {$status ? Math.round($status.uptime_seconds) : 0}s
   </p>
 </div>

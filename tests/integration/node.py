@@ -1,4 +1,4 @@
-"""Standalone headless Waypoint chat node used by the integration harness.
+"""Standalone headless MeshDeck chat node used by the integration harness.
 
 Each instance runs in its own subprocess (RNS module state is process-global).
 Exercises the real CoreService code path; talks JSON-lines on stdout for
@@ -18,8 +18,8 @@ import sys
 import time
 from pathlib import Path
 
-from waypoint.config import AppPaths
-from waypoint.core.service import CoreService
+from meshdeck.config import AppPaths
+from meshdeck.core.service import CoreService
 
 REANNOUNCE_SECONDS = 5
 RETRY_SEND_SECONDS = 3
@@ -217,8 +217,8 @@ def main() -> int:
         paths = AppPaths(data_dir=Path(args.data_dir))
         paths.ensure()
         if args.extra_config_file or args.no_autointerface or args.display_name:
-            from waypoint.config import SettingsStore
-            from waypoint.storage.db import Database
+            from meshdeck.config import SettingsStore
+            from meshdeck.storage.db import Database
 
             db = Database(paths.db_path)
             db.open()

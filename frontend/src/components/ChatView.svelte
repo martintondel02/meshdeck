@@ -133,7 +133,7 @@
         draft = "";
       }
     } catch {
-      sendError = "Not connected to the Waypoint daemon.";
+      sendError = "Not connected to the MeshDeck daemon.";
     } finally {
       sending = false;
     }

@@ -1,7 +1,7 @@
 // Token handling: the daemon prints the UI URL with ?token=…; we capture it
 // once into sessionStorage and scrub it from the address bar.
 
-const KEY = "waypoint_token";
+const KEY = "meshdeck_token";
 
 export function captureTokenFromUrl(): void {
   const url = new URL(window.location.href);

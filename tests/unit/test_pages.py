@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from waypoint.pages.storage import PageNameError, PageStore, validate_page_name
+from meshdeck.pages.storage import PageNameError, PageStore, validate_page_name
 
 
 def test_valid_names(tmp_path: Path) -> None:
@@ -56,7 +56,7 @@ def test_crud_and_escapes(tmp_path: Path) -> None:
 def test_default_index_served_when_missing(tmp_path: Path) -> None:
     """PageHost registers a placeholder handler for the default index when no
     index.mu exists — checked via the request-path map it builds."""
-    from waypoint.pages.hosting import default_index
+    from meshdeck.pages.hosting import default_index
 
     assert ">{" in default_index  # formatted with the node name
     assert ".mu" in default_index or "micron" in default_index.lower()

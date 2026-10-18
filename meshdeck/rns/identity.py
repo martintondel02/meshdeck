@@ -1,4 +1,4 @@
-"""Waypoint's Reticulum identity: load or create the private key."""
+"""MeshDeck's Reticulum identity: load or create the private key."""
 
 from __future__ import annotations
 

@@ -109,7 +109,7 @@ export function parseSnippet(text: string): InterfaceEntry[] {
 
 /** Render a shareable Reticulum config snippet for a server-kind entry. */
 export function shareSnippet(entry: InterfaceEntry, hostnameHint: string): string {
-  const name = entry.name || "Waypoint Entrypoint";
+  const name = entry.name || "MeshDeck Entrypoint";
   if (entry.kind === "tcp_server" || entry.kind === "backbone_server") {
     const itype =
       entry.kind === "backbone_server" ? "BackboneInterface" : "TCPServerInterface";

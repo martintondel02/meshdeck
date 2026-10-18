@@ -1,10 +1,10 @@
-# Waypoint
+# MeshDeck
 
 > An all-in-one Reticulum application — chat, file sharing, page hosting and network infrastructure, with a basic mode for everyone and an advanced mode for tinkerers.
 
-**Status:** early development (Phase 1). Working title "Waypoint" — final name TBD.
+**Status:** early development (Phase 1). Working title "MeshDeck" — final name TBD.
 
-Waypoint is a free and open-source application built on the
+MeshDeck is a free and open-source application built on the
 [Reticulum Network Stack](https://reticulum.network/). It aims to be the
 friendly front door to Reticulum: one program where you can message people,
 send files, publish pages, and run your own piece of network infrastructure —
@@ -13,7 +13,7 @@ without ever touching a config file, unless you *want* to.
 It fills a similar space to [MeshChatX](https://github.com/Quad4-Software/MeshChatX)
 (development ends January 2027), but is a fresh codebase with a different
 design focus: two first-class UI modes and guides/tooltips built into every
-screen. Waypoint is fully interoperable with MeshChatX and other LXMF-based
+screen. MeshDeck is fully interoperable with MeshChatX and other LXMF-based
 apps on the messaging layer.
 
 ## Design pillars
@@ -66,23 +66,23 @@ make dev                # build UI + start daemon  → prints the UI URL (with t
 make test               # unit tests
 make test-integration   # real-node tests: chat, files, restarts
 make lint               # ruff + svelte-check
-make package            # one-file binary with embedded UI (dist/waypoint)
+make package            # one-file binary with embedded UI (dist/meshdeck)
 ```
 
-Want just the runnable thing? `make package`, then run `./dist/waypoint` —
+Want just the runnable thing? `make package`, then run `./dist/meshdeck` —
 no Python install needed.
 
-`python -m waypoint --data-dir /tmp/x --port 8570` runs an isolated instance —
+`python -m meshdeck --data-dir /tmp/x --port 8570` runs an isolated instance —
 handy for local two-instance chats. Current status: **Phase 3 done**
 (chat, files, contacts, interfaces + hosting wizards, stamps, packaging);
 see [BUILD_PLAN.md §12/§15](BUILD_PLAN.md).
 
 ## License
 
-Waypoint's own code is MIT — see [LICENSE](LICENSE). Reticulum and LXMF are
+MeshDeck's own code is MIT — see [LICENSE](LICENSE). Reticulum and LXMF are
 distributed under their own licenses (Copyright (c) Mark Qvist and others,
 see the upstream projects); using them as libraries imposes no copyleft on
-Waypoint, but redistribution of the stack itself must follow the
+MeshDeck, but redistribution of the stack itself must follow the
 [Reticulum license](https://github.com/markqvist/Reticulum/blob/master/LICENSE).
 
 ## Acknowledgements

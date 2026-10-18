@@ -12,24 +12,24 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
-from waypoint.api.schemas import (
+from meshdeck.api.schemas import (
     BadRequest,
     optional_str,
     optional_str_from_path,
     require_hash,
     require_str,
 )
-from waypoint.chat.router import MAX_ATTACHMENT_TOTAL_BYTES
-from waypoint.core.events import Event
-from waypoint.core.service import CoreService
+from meshdeck.chat.router import MAX_ATTACHMENT_TOTAL_BYTES
+from meshdeck.core.events import Event
+from meshdeck.core.service import CoreService
 
 log = logging.getLogger(__name__)
 
 MAX_PORT_ATTEMPTS = 20
 
-_NOT_BUILT_PAGE = """<!doctype html><meta charset="utf-8"><title>Waypoint</title>
+_NOT_BUILT_PAGE = """<!doctype html><meta charset="utf-8"><title>MeshDeck</title>
 <body style="font-family:system-ui;margin:3em">
-<h1>Waypoint backend is running</h1>
+<h1>MeshDeck backend is running</h1>
 <p>The web UI hasn't been built yet. In the repo, run
 <code>cd frontend &amp;&amp; pnpm install &amp;&amp; pnpm run build</code>,
 then restart.</p>
@@ -207,7 +207,7 @@ class ApiServer:
     async def _restart(self, request: web.Request) -> web.Response:
         """Pre-validate the current config, then schedule a process restart.
 
-        Waypoint restarts by process re-exec (supervised by the CLI), because
+        MeshDeck restarts by process re-exec (supervised by the CLI), because
         this rns version's Reticulum singleton cannot be re-created in-process."""
         try:
             return _json(self.service.request_restart(), status=202)

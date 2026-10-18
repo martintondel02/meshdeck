@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Waypoint. Format based on Keep a Changelog.
+All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
@@ -81,10 +81,10 @@ All notable changes to Waypoint. Format based on Keep a Changelog.
 
 ### Added (Phase 1)
 
-- Backend daemon (`waypoint` package): managed Reticulum instance with
+- Backend daemon (`meshdeck` package): managed Reticulum instance with
   own configdir, identity management, LXMF chat router, peer discovery via
   `lxmf.delivery` announces, SQLite persistence, loopback REST + WebSocket API
-  with token auth, CLI (`python -m waypoint`).
+  with token auth, CLI (`python -m meshdeck`).
 - Web UI (Vite + Svelte 5 + Tailwind 4): onboarding, peer list with unread
   badges, chat view with delivery states, settings with basic/advanced mode
   toggle, tooltips everywhere jargon appears.

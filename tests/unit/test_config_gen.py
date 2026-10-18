@@ -1,7 +1,7 @@
 """Snapshot-style tests for the generated Reticulum config."""
 
-from waypoint.config import DEFAULT_SETTINGS
-from waypoint.rns.config_gen import render_config
+from meshdeck.config import DEFAULT_SETTINGS
+from meshdeck.rns.config_gen import render_config
 
 
 def test_default_basic_mode_config():

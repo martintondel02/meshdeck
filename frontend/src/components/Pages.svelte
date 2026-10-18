@@ -272,7 +272,7 @@
         Node name:
         <input
           bind:value={nodeName}
-          placeholder="My Waypoint Node"
+          placeholder="My MeshDeck Node"
           class="ml-2 bg-wp-bg border border-wp-border rounded-lg px-2 py-1 text-sm"
         />
       </label>

@@ -50,7 +50,7 @@ export const TOOLTIPS = {
   node_announce:
     "Announcing tells the network your node exists and publishes its name. Pages are served even without announcing, but then only people who already know your address can find you.",
   node_browse:
-    "Paste the address of any node that hosts pages (NomadNet node, Sideband, or another Waypoint instance) — Open fetches its home page over an encrypted, resumable link.",
+    "Paste the address of any node that hosts pages (NomadNet node, Sideband, or another MeshDeck instance) — Open fetches its home page over an encrypted, resumable link.",
 } as const;
 
 export const GLOSSARY = {

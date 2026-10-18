@@ -6,10 +6,10 @@ from __future__ import annotations
 import aiohttp
 import pytest
 
-from waypoint.api.server import ApiServer
-from waypoint.config import AppPaths, SettingsStore, load_or_create_token
-from waypoint.core.service import CoreService
-from waypoint.storage.db import Database
+from meshdeck.api.server import ApiServer
+from meshdeck.config import AppPaths, SettingsStore, load_or_create_token
+from meshdeck.core.service import CoreService
+from meshdeck.storage.db import Database
 
 pytestmark = pytest.mark.integration
 

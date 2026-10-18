@@ -1,12 +1,12 @@
-# Waypoint — Master Build Plan
+# MeshDeck — Master Build Plan
 
-This is the single source of truth for building Waypoint. It is written to be
+This is the single source of truth for building MeshDeck. It is written to be
 executed top-to-bottom by a builder (human or agent) without re-litigating
 decisions. If a section conflicts with reality (API changed, environment
 differs), update this file in the same commit that adapts the code.
 
-- **Project:** Waypoint (working title, rename freely — search/replace
-  `waypoint`/`Waypoint` when final name is chosen)
+- **Project:** MeshDeck (working title, rename freely — search/replace
+  `meshdeck`/`MeshDeck` when final name is chosen)
 - **Goal:** a free, open-source, all-in-one Reticulum application: chat, file
   transfer, page hosting, and server/entrypoint hosting — with a **basic
   mode** (guided, zero jargon) and an **advanced mode** (full control).
@@ -57,7 +57,7 @@ transport layer.
 | 4 | Backend | Python ≥3.11, `asyncio` + `aiohttp` + `websockets` (aiohttp WS is fine; pick ONE: **aiohttp web + aiohttp WS**) | Same family as ecosystem apps; single HTTP+WS server in one process |
 | 5 | Protocol libs | `rns`, `lxmf` from PyPI, pinned | Reference implementation, maintained |
 | 6 | Storage | SQLite via stdlib `sqlite3` (raw SQL, no ORM) | Zero-dep, inspectable, matches MeshChatX's hard-won choice |
-| 7 | Config ownership | Waypoint manages its **own** RNS configdir (`<data>/reticulum/`), generated from our settings store. Never touches `~/.reticulum`, `share_instance = No` | A broken system rnsd or user's own experiments must not break Waypoint, and vice versa |
+| 7 | Config ownership | MeshDeck manages its **own** RNS configdir (`<data>/reticulum/`), generated from our settings store. Never touches `~/.reticulum`, `share_instance = No` | A broken system rnsd or user's own experiments must not break MeshDeck, and vice versa |
 | 8 | Frontend | Vite + **Svelte 5** + TypeScript + Tailwind CSS v4 | Fast to build, small output, beginner-friendly |
 | 9 | DB migrations | Hand-rolled `PRAGMA user_version` migrations | No ORM → no migration framework needed |
 | 10 | License | MIT for our code (see LICENSE) | Free, permissive, compatible with ecosystem norms |
@@ -130,38 +130,38 @@ Rules for the builder:
    `asyncio.Lock`; or a single dedicated "db writer" task draining a queue.
    Prefer the queue writer — simplest mental model.
 
-### 5.2 Components (backend package `waypoint/`)
+### 5.2 Components (backend package `meshdeck/`)
 
 | Module | Responsibility |
 |---|---|
-| `waypoint/__main__.py` | CLI entry: `python -m waypoint [--data-dir X] [--port P] [--open-browser]` |
-| `waypoint/config.py` | Data-dir resolution (`platformdirs`), settings store (SQLite), first-run detection, auth-token generation/read |
-| `waypoint/rns/config_gen.py` | Renders `<data>/reticulum/config` from settings (interfaces, transport flag, logging). Pure function: settings dict → config text. Unit-test it heavily |
-| `waypoint/rns/stack.py` | `RnsStack`: owns `RNS.Reticulum(configdir=...)`, starts/stops with app, exposes interface list/status, restarts on config change |
-| `waypoint/rns/identity.py` | Load-or-create `RNS.Identity` at `<data>/identity` (0600), never logged; display-name management |
-| `waypoint/chat/router.py` | Wraps `LXMF.LXMRouter`: `register_delivery_identity`, delivery/announce callbacks → EventBus; `send(peer_hash, content, ...)`; outbound state tracking via per-message callbacks |
-| `waypoint/chat/peers.py` | Peer discovery: announce handler with `aspect_filter = "lxmf.delivery"`, decode display names (see §11), upsert into DB, announce self on start + on interval + on demand |
-| `waypoint/storage/db.py` | SQLite open/migrate (`PRAGMA user_version`), schema in §9 |
-| `waypoint/storage/messages.py` | Message CRUD, pagination queries, state updates |
-| `waypoint/core/events.py` | EventBus: `publish_from_thread(event_type, data)` → fan-out to WS subscribers + DB writer queue |
-| `waypoint/core/service.py` | Facade the API layer calls: `get_status()`, `send_message()`, `list_peers()`, etc. Owns component lifecycle (start/stop in order) |
-| `waypoint/api/server.py` | aiohttp app: REST + `/ws`, static frontend files, auth middleware (§8) |
-| `waypoint/util/hexid.py` | Hash prettifiers (first-8 display, etc.) |
+| `meshdeck/__main__.py` | CLI entry: `python -m meshdeck [--data-dir X] [--port P] [--open-browser]` |
+| `meshdeck/config.py` | Data-dir resolution (`platformdirs`), settings store (SQLite), first-run detection, auth-token generation/read |
+| `meshdeck/rns/config_gen.py` | Renders `<data>/reticulum/config` from settings (interfaces, transport flag, logging). Pure function: settings dict → config text. Unit-test it heavily |
+| `meshdeck/rns/stack.py` | `RnsStack`: owns `RNS.Reticulum(configdir=...)`, starts/stops with app, exposes interface list/status, restarts on config change |
+| `meshdeck/rns/identity.py` | Load-or-create `RNS.Identity` at `<data>/identity` (0600), never logged; display-name management |
+| `meshdeck/chat/router.py` | Wraps `LXMF.LXMRouter`: `register_delivery_identity`, delivery/announce callbacks → EventBus; `send(peer_hash, content, ...)`; outbound state tracking via per-message callbacks |
+| `meshdeck/chat/peers.py` | Peer discovery: announce handler with `aspect_filter = "lxmf.delivery"`, decode display names (see §11), upsert into DB, announce self on start + on interval + on demand |
+| `meshdeck/storage/db.py` | SQLite open/migrate (`PRAGMA user_version`), schema in §9 |
+| `meshdeck/storage/messages.py` | Message CRUD, pagination queries, state updates |
+| `meshdeck/core/events.py` | EventBus: `publish_from_thread(event_type, data)` → fan-out to WS subscribers + DB writer queue |
+| `meshdeck/core/service.py` | Facade the API layer calls: `get_status()`, `send_message()`, `list_peers()`, etc. Owns component lifecycle (start/stop in order) |
+| `meshdeck/api/server.py` | aiohttp app: REST + `/ws`, static frontend files, auth middleware (§8) |
+| `meshdeck/util/hexid.py` | Hash prettifiers (first-8 display, etc.) |
 
 Lifecycle order on start: config → db+migrate → RNS stack → identity → LXMF
 router → announce handler + self-announce → API server. Reverse on stop.
 
 ### 5.3 Reticulum config strategy
 
-Waypoint's data dir layout:
+MeshDeck's data dir layout:
 
 ```
-${XDG_DATA_HOME:-~/.local/share}/waypoint/
-├── waypoint.db            # SQLite (settings incl. mode, messages, peers, pages)
+${XDG_DATA_HOME:-~/.local/share}/meshdeck/
+├── meshdeck.db            # SQLite (settings incl. mode, messages, peers, pages)
 ├── identity               # RNS.Identity private key file, chmod 0600
 ├── token                  # local API auth token, chmod 0600
 ├── reticulum/
-│   └── config             # GENERATED by waypoint/rns/config_gen.py
+│   └── config             # GENERATED by meshdeck/rns/config_gen.py
 ├── lxmf/                  # LXMRouter storagepath
 ├── files/                 # received attachments (Phase 2)
 ├── pages/                 # hosted site content (Phase 3)
@@ -208,7 +208,7 @@ generation (with a visible warning).
 ├── BUILD_PLAN.md              # this file
 ├── README.md  LICENSE  .gitignore
 ├── pyproject.toml             # hatchling or setuptools backend; deps per §2
-├── waypoint/                  # backend package
+├── meshdeck/                  # backend package
 │   ├── __init__.py  __main__.py  version.py
 │   ├── config.py
 │   ├── api/{__init__.py,server.py,schemas.py}
@@ -230,31 +230,31 @@ generation (with a visible warning).
 └── Makefile                   # venv, install, dev, test, lint, build-frontend
 ```
 
-`rns/` subpackage name inside `waypoint/` is fine because absolute imports
-(`import RNS`) resolve against site-packages first when `waypoint` is
+`rns/` subpackage name inside `meshdeck/` is fine because absolute imports
+(`import RNS`) resolve against site-packages first when `meshdeck` is
 installed/used as the top package — but to eliminate any shadowing doubt,
-name it `waypoint/rnsx/` if import weirdness ever appears. Default: `rns/`
-inside the `waypoint` package is safe.
+name it `meshdeck/rnsx/` if import weirdness ever appears. Default: `rns/`
+inside the `meshdeck` package is safe.
 
 ---
 
 ## 7. Backend module specs (key signatures)
 
 ```python
-# waypoint/rns/config_gen.py
+# meshdeck/rns/config_gen.py
 def render_config(settings: dict) -> str: ...
-# waypoint/rns/stack.py
+# meshdeck/rns/stack.py
 class RnsStack:
     def __init__(self, configdir: Path): ...
     def start(self) -> None            # constructs RNS.Reticulum(configdir=...)
     def interfaces(self) -> list[dict] # name, type, online, bitrate...
     def stop(self) -> None
-# waypoint/rns/identity.py
+# meshdeck/rns/identity.py
 class IdentityManager:
     def load_or_create(self) -> RNS.Identity
     @property
     def hash_hex(self) -> str: ...
-# waypoint/chat/router.py
+# meshdeck/chat/router.py
 class ChatRouter:
     def __init__(self, stack, identity, storage: Storage, bus: EventBus): ...
     def start(self) -> None   # LXMRouter(identity=..., storagepath=..., autopeer=True)
@@ -262,7 +262,7 @@ class ChatRouter:
                               # router.register_delivery_callback(self._on_delivery)
     def send(self, peer_hash_hex: str, title: str, content: str) -> str  # returns msg hash hex
     def announce(self) -> None
-# waypoint/api/server.py
+# meshdeck/api/server.py
 def create_app(service: CoreService, token: str, static_dir: Path) -> aiohttp.web.Application
 ```
 
@@ -477,15 +477,15 @@ Builder: run `.venv/bin/python -c "import RNS, LXMF"` to confirm.
 1. `pyproject.toml` (setuptools backend, deps: `rns==1.5.7 lxmf==1.2.1
    aiohttp>=3.14 platformdirs msgpack`, extras dev: pytest pytest-asyncio
    ruff). `pip install -e .` works.
-2. `waypoint/config.py` — dirs, token, settings defaults.
-3. `waypoint/rns/config_gen.py` + unit tests (snapshot the rendered config
+2. `meshdeck/config.py` — dirs, token, settings defaults.
+3. `meshdeck/rns/config_gen.py` + unit tests (snapshot the rendered config
    for 3 settings variants).
-4. `waypoint/rns/{identity,stack}.py` — start/stop stack with managed
+4. `meshdeck/rns/{identity,stack}.py` — start/stop stack with managed
    configdir; unit: starts without exceptions (temporary dir).
-5. `waypoint/core/events.py` — EventBus thread bridge; unit test.
-6. `waypoint/storage/*` — schema v1 + migrate; unit tests.
-7. `waypoint/chat/{router,peers}.py` — LXMF wrap + announce discovery.
-8. `waypoint/core/service.py` + `waypoint/api/server.py` — REST + WS per §8,
+5. `meshdeck/core/events.py` — EventBus thread bridge; unit test.
+6. `meshdeck/storage/*` — schema v1 + migrate; unit tests.
+7. `meshdeck/chat/{router,peers}.py` — LXMF wrap + announce discovery.
+8. `meshdeck/core/service.py` + `meshdeck/api/server.py` — REST + WS per §8,
    auth middleware, CLI entry.
 9. Integration harness (§13) + `test_two_nodes.py` — **the acceptance test**.
 
@@ -502,7 +502,7 @@ Builder: run `.venv/bin/python -c "import RNS, LXMF"` to confirm.
 
 **Definition of done**
 - `make test` green, including two-process LXMF delivery test.
-- `python -m waypoint` serves UI on `http://127.0.0.1:8570`; two instances
+- `python -m meshdeck` serves UI on `http://127.0.0.1:8570`; two instances
   (`--data-dir /tmp/a --port 8570`, `--data-dir /tmp/b --port 8571`) on the
   same LAN/loopback discover each other within ~60s and exchange messages
   with delivery ticks.
@@ -518,7 +518,7 @@ Builder: run `.venv/bin/python -c "import RNS, LXMF"` to confirm.
   hash equality; UI shows progress both sides.
 
 ### Phase 3 — Host a page/site
-- Node destination per user: app `waypoint`, aspect `node`; request handler
+- Node destination per user: app `meshdeck`, aspect `node`; request handler
   serves micron pages + files (study NomadNet's node implementation and the
   "Serving Pages Over Nomad Network" manual section).
 - Basic: visual micron editor (toolbar inserts micron syntax; live preview
@@ -537,12 +537,12 @@ Builder: run `.venv/bin/python -c "import RNS, LXMF"` to confirm.
 - Diagnostics: announce table, path table, `rnpath`/`rnprobe` equivalents,
   live log tail, connection doctor heuristics.
 - Blackhole management UI.
-- DoD: user can turn a fresh Waypoint install into a working TCP-gateway
+- DoD: user can turn a fresh MeshDeck install into a working TCP-gateway
   entrypoint in ≤5 clicks without editing text; `rnstatus`-equivalent view
   renders real interface data.
 
 ### Phase 5 — Packaging & docs
-- PyPI package (console script `waypoint`), Docker image, systemd unit file,
+- PyPI package (console script `meshdeck`), Docker image, systemd unit file,
   desktop shell spike (Tauri first), GitHub Actions: lint+test matrix
   (Linux/macOS/Windows; Python 3.11–3.14), release workflow building wheels.
 - Docs site from `docs/guides` (same markdown as in-app), CONTRIBUTING.md,
@@ -601,7 +601,7 @@ phase; Playwright optional from Phase 5.
 1. **Threads**: RNS callbacks ≠ asyncio. Only `call_soon_threadsafe`.
 2. **Process-global RNS state**: never construct two `RNS.Reticulum` in one
    process; tests use subprocesses.
-3. **`share_instance = No`** in generated config — otherwise Waypoint
+3. **`share_instance = No`** in generated config — otherwise MeshDeck
    silently binds to a running system `rnsd` and appears "broken".
 4. **Announce storms**: respect rate limits; on hosted/gateway interfaces
    always set `announce_rate_target/grace/penalty` presets (see manual).
@@ -663,7 +663,7 @@ phase; Playwright optional from Phase 5.
 integration test (5.4s), full manual E2E with two daemons over the real
 REST/WS API (auth enforced, discovery, delivery receipts, live WS events).
 
-- [x] 1. `pyproject.toml` + package skeleton + `python -m waypoint` stub
+- [x] 1. `pyproject.toml` + package skeleton + `python -m meshdeck` stub
 - [x] 2. `config.py` + `storage/db.py` + migrations + unit tests
 - [x] 3. `rns/config_gen.py` + unit tests (snapshot 3 variants)
 - [x] 4. `core/events.py` + unit test

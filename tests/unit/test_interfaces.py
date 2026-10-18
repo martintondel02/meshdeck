@@ -1,6 +1,6 @@
 """Unit tests for the structured interface list rendering (Phase 3)."""
 
-from waypoint.rns.config_gen import render_config, validate_interfaces
+from meshdeck.rns.config_gen import render_config, validate_interfaces
 
 
 def _settings(**over):
@@ -106,7 +106,7 @@ def test_duplicate_subsection_names_are_caught_by_preflight(tmp_path):
     must fail validation cleanly (no silent RNS hard-exit)."""
     import pytest
 
-    from waypoint.rns.stack import InvalidConfigError, validate_interface_config
+    from meshdeck.rns.stack import InvalidConfigError, validate_interface_config
 
     text = render_config(
         _settings(

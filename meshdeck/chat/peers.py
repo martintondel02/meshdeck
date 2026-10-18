@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import msgpack
 import RNS
 
-from waypoint.core.events import EventBus
+from meshdeck.core.events import EventBus
 
 log = logging.getLogger(__name__)
 

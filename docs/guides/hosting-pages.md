@@ -1,6 +1,6 @@
 # Hosting and browsing pages on Reticulum
 
-Waypoint nodes can **host pages** (NomadNet-compatible) and **browse** pages
+MeshDeck nodes can **host pages** (NomadNet-compatible) and **browse** pages
 hosted by others. Pages are tiny, encrypted, work over any transport (radio,
 LAN, serial, TCP) — no web server, no DNS, no IP addresses to share.
 
@@ -24,7 +24,7 @@ Your node address is the 32-character hash shown at the top of *My pages*.
 Share it like a chat address.
 
 > ⚠️ Executable pages (`.mu` files with the execute bit) are **not** run by
-> Waypoint — NomadNet executes them server-side; we deliberately keep pages
+> MeshDeck — NomadNet executes them server-side; we deliberately keep pages
 > static for safety.
 
 ## Browsing other nodes
@@ -40,7 +40,7 @@ Click one (or paste any node address) and **Open** to fetch their home page.
 
 ## Compatibility
 
-Waypoint implements the same node scheme as NomadNet (destination aspect
+MeshDeck implements the same node scheme as NomadNet (destination aspect
 `nomadnetwork.node`, request paths `/page/...`), so your pages are also
 browsable from NomadNet and any client speaking that protocol — and you can
 browse theirs the same way.

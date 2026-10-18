@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from waypoint.util.hexid import is_valid_hash_hex
+from meshdeck.util.hexid import is_valid_hash_hex
 
 
 class BadRequest(Exception):

@@ -31,9 +31,9 @@
 <div class="min-h-screen flex items-center justify-center p-6">
   <div class="w-full max-w-md bg-wp-panel border border-wp-border rounded-2xl p-8 shadow-2xl">
     <div class="text-3xl mb-1">🧭</div>
-    <h1 class="text-2xl font-bold mb-2">Welcome to Waypoint</h1>
+    <h1 class="text-2xl font-bold mb-2">Welcome to MeshDeck</h1>
     <p class="text-wp-dim text-sm mb-6 leading-relaxed">
-      Waypoint runs your own node on the Reticulum network — fully encrypted,
+      MeshDeck runs your own node on the Reticulum network — fully encrypted,
       decentralized, and owned by you. Let's set you up in two seconds.
     </p>
 

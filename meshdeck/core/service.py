@@ -15,38 +15,38 @@ from typing import Any
 
 import RNS
 
-from waypoint import __version__
-from waypoint.chat.peers import LxmfPeerAnnounceHandler
-from waypoint.chat.router import (
+from meshdeck import __version__
+from meshdeck.chat.peers import LxmfPeerAnnounceHandler
+from meshdeck.chat.router import (
     ChatRouter,
     MessageTooLargeError,
     PeerUnknownError,
     PropagationNodeNotConfigured,
     sanitize_filename,
 )
-from waypoint.config import (
+from meshdeck.config import (
     DEFAULT_SETTINGS,
     DELIVERY_METHODS,
     VALID_MODES,
     AppPaths,
     SettingsStore,
 )
-from waypoint.core.events import Event, EventBus
-from waypoint.pages.client import PageFetchError, fetch_page
-from waypoint.pages.hosting import NodeAnnounceHandler, PageHost
-from waypoint.pages.storage import PageNameError
-from waypoint.rns.config_gen import render_config, validate_interfaces
-from waypoint.rns.identity import IdentityManager
-from waypoint.rns.stack import InvalidConfigError, RnsStack, validate_interface_config
-from waypoint.storage import messages as msg_repo
-from waypoint.storage import nodes as node_repo
-from waypoint.storage import peers as peer_repo
-from waypoint.storage.db import Database
-from waypoint.util.hexid import is_valid_hash_hex, is_valid_msg_hash_hex
+from meshdeck.core.events import Event, EventBus
+from meshdeck.pages.client import PageFetchError, fetch_page
+from meshdeck.pages.hosting import NodeAnnounceHandler, PageHost
+from meshdeck.pages.storage import PageNameError
+from meshdeck.rns.config_gen import render_config, validate_interfaces
+from meshdeck.rns.identity import IdentityManager
+from meshdeck.rns.stack import InvalidConfigError, RnsStack, validate_interface_config
+from meshdeck.storage import messages as msg_repo
+from meshdeck.storage import nodes as node_repo
+from meshdeck.storage import peers as peer_repo
+from meshdeck.storage.db import Database
+from meshdeck.util.hexid import is_valid_hash_hex, is_valid_msg_hash_hex
 
 log = logging.getLogger(__name__)
 
-# Settings that require an RNS restart to take effect. Waypoint restarts the
+# Settings that require an RNS restart to take effect. MeshDeck restarts the
 # whole process (os.execv) because RNS.Reticulum is a never-cleared singleton
 # in this rns version — an in-process re-instance raises OSError.
 RESTART_SETTINGS = {
@@ -144,7 +144,7 @@ class CoreService:
         self._announce_task = asyncio.create_task(self._announce_loop())
         self._poll_task = asyncio.create_task(self._poll_pending_loop())
         self._started_ts = time.time()
-        log.info("waypoint core started")
+        log.info("meshdeck core started")
 
     async def stop(self) -> None:
         for task in (self._announce_task, self._poll_task):
@@ -157,7 +157,7 @@ class CoreService:
             self.stack.stop()
         if self.db is not None:
             self.db.close()
-        log.info("waypoint core stopped")
+        log.info("meshdeck core stopped")
 
     async def _announce_loop(self) -> None:
         while True:

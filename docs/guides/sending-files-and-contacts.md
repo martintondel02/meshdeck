@@ -11,7 +11,7 @@
    delivery ticks (… → ✓ → ✓✓ when the peer's node confirms).
 
 Files ride **inside the LXMF message**, so they're end-to-end encrypted and
-signed exactly like chat text. Waypoint stores received files under
+signed exactly like chat text. MeshDeck stores received files under
 `<data-dir>/files/<peer-hash>/<message-hash>/` and serves them to the UI via
 `/api/v1/attachments/…` (token-protected).
 
@@ -29,7 +29,7 @@ signed exactly like chat text. Waypoint stores received files under
 - **Discover automatically**: peers appear when they announce (they'll show a
   green dot if seen in the last 10 minutes).
 - **Add by address**: press ＋ in the Peers panel and paste their 32-character
-  hash. Waypoint asks the network for a path to them immediately — no need to
+  hash. MeshDeck asks the network for a path to them immediately — no need to
   wait for an announce.
 - **Rename**: ⋯ → Rename… gives a peer a local nickname.
 - **Block**: ⋯ → Block hides their messages; the peer disappears from the list.

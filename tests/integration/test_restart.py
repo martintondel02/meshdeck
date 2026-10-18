@@ -78,8 +78,8 @@ def launch_a(workdir: Path, port: int, watch_file: Path) -> subprocess.Popen:
 
 
 def test_restart_applies_new_interface_config(tmp_path):
-    from waypoint.config import AppPaths, SettingsStore
-    from waypoint.storage.db import Database
+    from meshdeck.config import AppPaths, SettingsStore
+    from meshdeck.storage.db import Database
 
     dir_a = tmp_path / "node_a"
     dir_b = tmp_path / "node_b"

@@ -1,6 +1,6 @@
 """Unit tests for chat router helpers (no network)."""
 
-from waypoint.chat.router import MAX_ATTACHMENT_TOTAL_BYTES, sanitize_filename
+from meshdeck.chat.router import MAX_ATTACHMENT_TOTAL_BYTES, sanitize_filename
 
 
 def test_sanitize_filename_strips_paths_and_weirdness():

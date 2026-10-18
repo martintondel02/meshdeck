@@ -24,7 +24,7 @@ from test_two_nodes import (
 
 pytestmark = pytest.mark.integration
 
-PAGE = """>Waypoint Test Node
+PAGE = """>MeshDeck Test Node
 
 Welcome to the test node!
 
