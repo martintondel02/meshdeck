@@ -33,6 +33,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # Phase 2: delivery behaviour
     "delivery_method": "direct",  # "direct" | "propagated" | "opportunistic"
     "propagation_node_hash": "",  # hex hash of an LXMF propagation node
+    # Phase 4: page hosting (nomadnetwork.node)
+    "node_name": "",  # public name of the hosted node; empty = "<display>'s Node"
+    "serve_pages": False,  # announce the node destination so others can find it
 }
 
 DELIVERY_METHODS = ("direct", "propagated", "opportunistic")

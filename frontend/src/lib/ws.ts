@@ -7,8 +7,10 @@ import {
   connected,
   markUnread,
   messages,
+  nodes,
   peers,
   upsertMessage,
+  type NodeMeta,
   type Peer,
 } from "./stores";
 
@@ -110,6 +112,10 @@ function handleEvent(event: string, data: Record<string, unknown>): void {
       // refetch peer list for simplicity
       api<Peer[]>("/api/v1/peers").then((p) => peers.set(p));
       break;
+    case "node_announced": {
+      api<NodeMeta[]>("/api/v1/nodes").then((n) => nodes.set(n));
+      break;
+    }
   }
 }
 

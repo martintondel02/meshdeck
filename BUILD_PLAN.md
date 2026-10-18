@@ -713,9 +713,26 @@ the new interface is live after re-exec.
 - [x] 28. PyInstaller packaging: `make package` → one-file binary with the UI
       embedded (frontend/dist as data files)
 
-**Phase 4 (next):** Reticulum page/site hosting (NomadNet-compatible `.mu`
-pages served from Waypoint; "publish a page" wizard; discover/browse pages of
-peers), LXMF page delivery, resource-progress UI for large transfers.
+**Phase 4 done so far (2026-10-18):** NomadNet-compatible page hosting over
+RNS Links: `nomadnetwork.node` destination + `/page/<name>` request handlers
+(same wire behaviour as the reference NomadNet node — plain utf-8 content is
+the response), node announces with the node name, discovery of other nodes
+via announce handler (`nomadnetwork.node` aspect), client-side page fetching
+via `RNS.Link.request` (blocking in a thread; `no_path`/`link_timeout`
+codes). UI: Pages view (editor + live micron preview + publish toggle +
+discovered-nodes chips + reader with rendered micron + timing), guide pages
+for hosting/browsing.
+
+Pitfall §14.19: RNS validates response-generator arity exactly — the six-arg
+`(path, data, request_id, link_id, remote_identity, requested_at)` signature
+from NomadNet's Node.py is mandatory (a `*args` variant dies in the Link job
+thread with "Invalid signature for response generator callback" and the
+client just sees link established then no response).
+
+**Phase 4 remaining:** `/file` + `/media` handlers (file hosting via node),
+page caching, executable pages considered (deferred on purpose), resource
+progress UI for large responses, `lxm.FIELD` file hosting via chat still
+stands.
 
 **Phase 5 (after):** i18n scaffolding, packaged releases (Flatpak/AppImage/
 Windows exe from the PyInstaller base), accessibility pass, first public tag.

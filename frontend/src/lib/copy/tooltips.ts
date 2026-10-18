@@ -45,6 +45,12 @@ export const TOOLTIPS = {
     "A transport node forwards traffic for others, strengthening the mesh. Only enable on machines that stay online and are well connected.",
   stamp_sending:
     "This peer requires anti-spam proof-of-work (a stamp). Your message is generated automatically — the checkmark just takes a few extra seconds.",
+  hosting_pages:
+    'Your node can host "pages" (micron markup — think a tiny encrypted web site) directly through Reticulum. Visitors need only your node address: no DNS, no web server, works over radio links too.',
+  node_announce:
+    "Announcing tells the network your node exists and publishes its name. Pages are served even without announcing, but then only people who already know your address can find you.",
+  node_browse:
+    "Paste the address of any node that hosts pages (NomadNet node, Sideband, or another Waypoint instance) — Open fetches its home page over an encrypted, resumable link.",
 } as const;
 
 export const GLOSSARY = {

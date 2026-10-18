@@ -32,10 +32,14 @@ from waypoint.config import (
     SettingsStore,
 )
 from waypoint.core.events import Event, EventBus
+from waypoint.pages.client import PageFetchError, fetch_page
+from waypoint.pages.hosting import NodeAnnounceHandler, PageHost
+from waypoint.pages.storage import PageNameError
 from waypoint.rns.config_gen import render_config, validate_interfaces
 from waypoint.rns.identity import IdentityManager
 from waypoint.rns.stack import InvalidConfigError, RnsStack, validate_interface_config
 from waypoint.storage import messages as msg_repo
+from waypoint.storage import nodes as node_repo
 from waypoint.storage import peers as peer_repo
 from waypoint.storage.db import Database
 from waypoint.util.hexid import is_valid_hash_hex, is_valid_msg_hash_hex
@@ -69,6 +73,8 @@ class CoreService:
         self.stack: RnsStack | None = None
         self.chat: ChatRouter | None = None
         self.announce_handler: LxmfPeerAnnounceHandler | None = None
+        self.pages: PageHost | None = None
+        self.node_announce_handler: NodeAnnounceHandler | None = None
         self._announce_task: asyncio.Task | None = None
         self._poll_task: asyncio.Task | None = None
         self._started_ts = 0.0
@@ -124,6 +130,16 @@ class CoreService:
         )
         RNS.Transport.register_announce_handler(self.announce_handler)
 
+        # Page hosting: nomadnetwork.node destination + announce handler.
+        self.pages = PageHost(self.paths.pages_dir, self.identity, self.bus)
+        self.pages.start(node_name=self.settings.get("node_name") or "")
+        self.node_announce_handler = NodeAnnounceHandler(
+            self.bus, own_hash_hex=self.pages.node_destination_hash_hex
+        )
+        RNS.Transport.register_announce_handler(self.node_announce_handler)
+        if self.settings.get("serve_pages"):
+            await asyncio.to_thread(self.pages.announce)
+
         await asyncio.to_thread(self.chat.announce)
         self._announce_task = asyncio.create_task(self._announce_loop())
         self._poll_task = asyncio.create_task(self._poll_pending_loop())
@@ -152,6 +168,8 @@ class CoreService:
             await asyncio.sleep(interval_min * 60)
             try:
                 await asyncio.to_thread(self.chat.announce)
+                if self.pages is not None and self.settings.get("serve_pages"):
+                    await asyncio.to_thread(self.pages.announce)
             except Exception:  # noqa: BLE001
                 log.exception("periodic announce failed")
 
@@ -177,7 +195,10 @@ class CoreService:
         assert self.db is not None
         async with self._db_lock:
             try:
-                if event.type == "peer_announced":
+                if event.type == "node_announced":
+                    d = event.data
+                    node_repo.upsert_node(self.db, d["hash"], d.get("name"))
+                elif event.type == "peer_announced":
                     d = event.data
                     peer_repo.upsert_peer(
                         self.db,
@@ -419,6 +440,8 @@ class CoreService:
 
     async def announce_now(self) -> dict[str, Any]:
         await asyncio.to_thread(self.chat.announce)
+        if self.pages is not None and self.settings.get("serve_pages"):
+            await asyncio.to_thread(self.pages.announce)
         return {"announced": True, "ts": time.time()}
 
     # -- restart (network reconfigure) ------------------------------------------
@@ -448,3 +471,82 @@ class CoreService:
         # Defer the flip slightly so the HTTP response can complete first.
         asyncio.get_running_loop().call_later(0.4, self.restart_requested.set)
         return {"restarting": True}
+
+    # -- pages / node hosting ---------------------------------------------------
+
+    def list_pages(self) -> list[dict[str, Any]]:
+        return self.pages.store.list_pages()
+
+    def read_page(self, name: str) -> str:
+        try:
+            return self.pages.store.read(name)
+        except PageNameError:
+            raise ValueError("invalid_page_name") from None
+        except FileNotFoundError:
+            raise ValueError("not_found") from None
+
+    def save_page(self, name: str, content: str) -> dict[str, Any]:
+        try:
+            result = self.pages.store.write(name, content)
+        except PageNameError as exc:
+            raise ValueError("invalid_page_name") from exc
+        self.pages.register_all_pages()
+        return result
+
+    def delete_page(self, name: str) -> None:
+        try:
+            self.pages.store.delete(name)
+        except PageNameError:
+            raise ValueError("invalid_page_name") from None
+
+    async def publish_node(
+        self, node_name: str | None = None, serve: bool | None = None
+    ) -> dict[str, Any]:
+        """Update node presentation and announce immediately when enabled."""
+        if node_name is not None:
+            self.settings.set("node_name", node_name.strip())
+            self.pages.set_node_name(node_name.strip())
+        if serve is not None:
+            self.settings.set("serve_pages", bool(serve))
+        announced = False
+        if self.settings.get("serve_pages"):
+            await asyncio.to_thread(self.pages.announce)
+            announced = True
+        return {
+            "node_hash": self.pages.node_destination_hash_hex,
+            "node_name": self.pages.node_name,
+            "serve_pages": bool(self.settings.get("serve_pages")),
+            "announced": announced,
+        }
+
+    def node_info(self) -> dict[str, Any]:
+        return {
+            "node_hash": self.pages.node_destination_hash_hex,
+            "node_name": self.pages.node_name,
+            "serve_pages": bool(self.settings.get("serve_pages")),
+        }
+
+    def list_nodes(self) -> list[dict[str, Any]]:
+        return node_repo.list_nodes(self.db)
+
+    async def browse_page(
+        self, node_hash: str, path: str
+    ) -> dict[str, Any]:
+        if not path.startswith("/page/"):
+            path = "/page/" + path.lstrip("/")
+        started = time.time()
+        try:
+            data = await asyncio.wait_for(
+                asyncio.to_thread(fetch_page, node_hash, path), timeout=40
+            )
+        except PageFetchError as exc:
+            raise ValueError(str(exc)) from None
+        except TimeoutError:
+            raise ValueError("link_timeout") from None
+        return {
+            "node_hash": node_hash,
+            "path": path,
+            "content": data.decode("utf-8", "replace"),
+            "bytes": len(data),
+            "elapsed_ms": round((time.time() - started) * 1000, 1),
+        }

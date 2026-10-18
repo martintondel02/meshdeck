@@ -78,6 +78,37 @@ export const unread = writable<Record<string, number>>({});
 export const activePeer = writable<string | null>(null);
 export const connected = writable(false);
 
+export interface PageMeta {
+  name: string;
+  size: number;
+  updated: number;
+}
+
+export interface NodeMeta {
+  hash: string;
+  name: string | null;
+  first_seen: number;
+  last_seen: number;
+}
+
+export interface NodeInfo {
+  node_hash: string;
+  node_name: string;
+  serve_pages: boolean;
+}
+
+export interface BrowseResult {
+  node_hash: string;
+  path: string;
+  content: string;
+  bytes: number;
+  elapsed_ms: number;
+}
+
+export const pages = writable<PageMeta[]>([]);
+export const nodes = writable<NodeMeta[]>([]);
+export const nodeInfo = writable<NodeInfo | null>(null);
+
 export const mode = derived(settings, ($s) =>
   $s.mode === "advanced" ? "advanced" : "basic",
 );

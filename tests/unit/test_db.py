@@ -3,22 +3,23 @@
 import time
 
 from waypoint.storage import messages as msg_repo
+from waypoint.storage import nodes as node_repo
 from waypoint.storage import peers as peer_repo
 from waypoint.storage.db import Database
 
 
 def test_migrate_creates_schema(tmp_path):
     with Database(tmp_path / "t.db") as db:
-        assert db.user_version == 1
+        assert db.user_version == 2
         tables = {r[0] for r in db.query("SELECT name FROM sqlite_master WHERE type='table'")}
-        assert {"settings", "peers", "messages"} <= tables
+        assert {"settings", "peers", "messages", "nodes"} <= tables
 
 
 def test_migrate_is_idempotent(tmp_path):
     with Database(tmp_path / "t.db") as db:
         db.migrate()
         db.migrate()
-        assert db.user_version == 1
+        assert db.user_version == 2
 
 
 def test_peer_upsert_and_patch(tmp_path):
@@ -38,6 +39,17 @@ def test_peer_upsert_and_patch(tmp_path):
         peer = peer_repo.get_peer(db, "aa" * 16)
         assert peer["nickname"] == "Ally"
         assert peer["blocked"] == 1
+
+
+def test_nodes_repo(tmp_path):
+    with Database(tmp_path / "t.db") as db:
+        node_repo.upsert_node(db, "cc" * 16, "Test Node")
+        node_repo.upsert_node(db, "cc" * 16, None)  # keep existing name
+        nodes = node_repo.list_nodes(db)
+        assert len(nodes) == 1
+        assert nodes[0]["name"] == "Test Node"
+        node_repo.upsert_node(db, "cc" * 16, "Renamed Node")
+        assert node_repo.list_nodes(db)[0]["name"] == "Renamed Node"
 
 
 def test_message_lifecycle(tmp_path):

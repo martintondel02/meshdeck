@@ -45,6 +45,21 @@
         "Advanced mode → Settings → Message delivery lets you set a propagation node address and switch your default delivery method.",
       ],
     },
+    {
+      title: "Hosting pages",
+      body: [
+        "Waypoint can host NomadNet-compatible pages right from your node — think a tiny encrypted web-site that needs no server, no DNS, and works over any transport Reticulum supports.",
+        "Pages tab → create index.mu, write in micron markup (> heading, `*bold`*, • bullets, [label`/page/other.mu] links). Pages are live the moment you save.",
+        "Switch on Announce my node to make your node discoverable, or share the node address directly with friends.",
+      ],
+    },
+    {
+      title: "Browsing nodes",
+      body: [
+        "In Pages → Browse other nodes, discovered nodes appear as chips. Or paste any node address and press Open — the page comes over an encrypted, resumable link.",
+        "Anything another NomadNet or Sideband node hosts, Waypoint can browse. Everything Waypoint hosts, they can browse too.",
+      ],
+    },
   ];
 </script>
 

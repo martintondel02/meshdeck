@@ -4,7 +4,29 @@ All notable changes to Waypoint. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added (Phase 4)
+
+- **Page hosting (NomadNet-compatible)**: your node can serve micron `.mu`
+  pages over encrypted RNS links (destination `nomadnetwork.node`, the same
+  wire scheme as NomadNet) — a tiny website with no web server, no DNS, no
+  IP sharing. Pages are live the moment they're saved.
+- Pages tab in the UI: create/edit/delete pages with live micron preview,
+  node name + announce toggle, discovered-nodes chips, and a built-in
+  reader that renders pages fetched from other nodes (with fetch timing).
+- Node announces carry the node name; discovered nodes are remembered
+  (new `nodes` table, DB schema v2).
+- Unit + integration coverage: page store validation/traversal, node repo,
+  API CRUD + publish + browse-validation, page round-trip over a real
+  two-node link, and node announce discovery.
+
+### Fixed (pre-release)
+
+- Request-handler generators must declare exactly the six parameters RNS's
+  Link dispatcher expects; the test suite caught the mismatch
+  (`Invalid signature for response generator callback`).
+
 ### Added (Phase 3)
+
 
 - Interfaces wizard (advanced): structured `interfaces` settings rendered
   into the managed Reticulum config — TCP server/client, backbone

@@ -47,6 +47,12 @@ async def run(args: argparse.Namespace) -> int:
             jlog(event="peer_announced", **event.data)
             if args.send_to and event.data["destination_hash"] == args.send_to:
                 peer_found.set()
+        elif event.type == "node_announced":
+            jlog(event="node_announced", **event.data)
+            if args.expect_node and event.data.get("hash") == args.expect_node:
+                result["ok"] = True
+                result["node_found"] = event.data
+                done_condition.set()
         elif event.type == "message_received":
             jlog(event="message_received", **{k: v for k, v in event.data.items()})
             matched_text = args.expect and event.data.get("content") == args.expect
@@ -77,6 +83,26 @@ async def run(args: argparse.Namespace) -> int:
 
     service.bus.subscribe(on_event)
     await service.start()
+
+    if args.serve_node:
+        # parent may have pre-written pages into <data>/pages
+        await service.publish_node(node_name=args.serve_node, serve=True)
+        jlog(event="node_published", hash=service.pages.node_destination_hash_hex)
+
+    if args.fetch_page_from:
+        async def fetcher() -> None:
+            for attempt in range(60):
+                try:
+                    r = await service.browse_page(args.fetch_page_from, args.page_path)
+                    result["ok"] = True
+                    result["fetched"] = r
+                    done_condition.set()
+                    return
+                except ValueError as exc:
+                    jlog(event="fetch_retry", attempt=attempt, error=str(exc))
+                    await asyncio.sleep(3)
+
+        asyncio.create_task(fetcher())
 
     if args.restart_watch_file:
         watch_path = Path(args.restart_watch_file)
@@ -168,6 +194,13 @@ def main() -> int:
                         help="reply with this text when the expect condition matches")
     parser.add_argument("--restart-watch-file", default=None,
                         help="when this file is touched after boot, re-exec the process")
+    parser.add_argument("--serve-node", default=None,
+                        help="publish pages with this node name and announce")
+    parser.add_argument("--fetch-page-from", default=None,
+                        help="fetch a page from this node destination hash")
+    parser.add_argument("--page-path", default="/page/index.mu")
+    parser.add_argument("--expect-node", default=None,
+                        help="done when a nomadnetwork.node announce with this hash arrives")
     parser.add_argument("--ready-file", required=True)
     parser.add_argument("--done-file", required=True)
     parser.add_argument("--timeout", type=int, default=120)

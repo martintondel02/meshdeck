@@ -40,6 +40,14 @@ CREATE INDEX IF NOT EXISTS idx_messages_peer ON messages(peer_hash, created_ts);
 # Ordered migrations: (target user_version, SQL)
 MIGRATIONS: list[tuple[int, str]] = [
     (1, SCHEMA_V1),
+    (2, """
+CREATE TABLE IF NOT EXISTS nodes(
+  hash TEXT PRIMARY KEY,          -- nomadnetwork.node destination hash
+  name TEXT,                      -- announced node name
+  first_seen REAL,
+  last_seen REAL
+);
+"""),
 ]
 
 

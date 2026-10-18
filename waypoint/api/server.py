@@ -98,6 +98,14 @@ class ApiServer:
         app.router.add_get(
             "/api/v1/attachments/{peer}/{msg}/{index}", self._download_attachment
         )
+        app.router.add_get("/api/v1/pages", self._pages_list)
+        app.router.add_get("/api/v1/pages/{name:.+}", self._page_read)
+        app.router.add_put("/api/v1/pages/{name:.+}", self._page_save)
+        app.router.add_delete("/api/v1/pages/{name:.+}", self._page_delete)
+        app.router.add_get("/api/v1/node", self._node_info)
+        app.router.add_post("/api/v1/node/publish", self._node_publish)
+        app.router.add_get("/api/v1/nodes", self._nodes_discovered)
+        app.router.add_get("/api/v1/browse/{hash}/{path:.+}", self._browse_page)
         app.router.add_get("/api/v1/settings", self._get_settings)
         app.router.add_put("/api/v1/settings", self._put_settings)
         app.router.add_post("/api/v1/announce", self._announce)
@@ -258,6 +266,54 @@ class ApiServer:
         path, safe_name = resolved
         return web.FileResponse(
             path, headers={"Content-Disposition": f'attachment; filename="{safe_name}"'}
+        )
+
+    # -- pages / node hosting -------------------------------------------------
+
+    async def _pages_list(self, request: web.Request) -> web.Response:
+        return _json(self.service.list_pages())
+
+    async def _page_read(self, request: web.Request) -> web.Response:
+        return _json(
+            {
+                "name": request.match_info["name"],
+                "content": self.service.read_page(request.match_info["name"]),
+            }
+        )
+
+    async def _page_save(self, request: web.Request) -> web.Response:
+        data = await request.json()
+        if not isinstance(data, dict) or "content" not in data:
+            raise BadRequest("missing_content", "expected {'content': text}")
+        result = self.service.save_page(
+            request.match_info["name"], str(data.get("content", ""))
+        )
+        return _json(result)
+
+    async def _page_delete(self, request: web.Request) -> web.Response:
+        self.service.delete_page(request.match_info["name"])
+        return _json({"deleted": request.match_info["name"]})
+
+    async def _node_info(self, request: web.Request) -> web.Response:
+        return _json(self.service.node_info())
+
+    async def _node_publish(self, request: web.Request) -> web.Response:
+        data = await request.json()
+        return _json(
+            await self.service.publish_node(
+                node_name=data.get("node_name"),
+                serve=data.get("serve"),
+            )
+        )
+
+    async def _nodes_discovered(self, request: web.Request) -> web.Response:
+        return _json(self.service.list_nodes())
+
+    async def _browse_page(self, request: web.Request) -> web.Response:
+        return _json(
+            await self.service.browse_page(
+                request.match_info["hash"], request.match_info["path"]
+            )
         )
 
     # -- WebSocket -----------------------------------------------------------

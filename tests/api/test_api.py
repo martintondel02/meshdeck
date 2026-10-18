@@ -125,6 +125,42 @@ async def test_api_endtoend(tmp_path):
                 await ws.send_str('{"type":"cmd","id":2,"cmd":"bogus"}')
                 err = _json_mod.loads((await ws.receive()).data)
                 assert err["type"] == "error" and err["error"]["code"] == "unknown_cmd"
+
+            # --- pages CRUD + node publish
+            async with s.put(
+                f"{base}/api/v1/pages/index.mu",
+                headers=auth,
+                json={"content": ">Hello World\\nThis is my node."},
+            ) as r:
+                assert r.status == 200
+                assert (await r.json())["name"] == "index.mu"
+            async with s.put(
+                f"{base}/api/v1/pages/Index.MU",  # uppercase = invalid name
+                headers=auth,
+                json={"content": "x"},
+            ) as r:
+                assert r.status == 400  # invalid page name rejected
+            async with s.get(f"{base}/api/v1/pages", headers=auth) as r:
+                assert [p["name"] for p in await r.json()] == ["index.mu"]
+            async with s.get(f"{base}/api/v1/pages/index.mu", headers=auth) as r:
+                assert (await r.json())["content"].startswith(">Hello World")
+            async with s.post(
+                f"{base}/api/v1/node/publish",
+                headers=auth,
+                json={"node_name": "Test Node", "serve": True},
+            ) as r:
+                assert r.status == 200
+                info = await r.json()
+                assert info["announced"] is True
+                assert len(info["node_hash"]) == 32
+            async with s.get(f"{base}/api/v1/node", headers=auth) as r:
+                node = await r.json()
+                assert node["node_name"] == "Test Node"
+                assert node["serve_pages"] is True
+            async with s.get(
+                f"{base}/api/v1/browse/zz/index.mu", headers=auth
+            ) as r:
+                assert r.status == 400  # invalid node hash
     finally:
         await server.stop()
         await service.stop()
