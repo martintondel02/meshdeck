@@ -17,8 +17,11 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
-from meshdeck.config import AppPaths
+import RNS
+
+from meshdeck.config import DEFAULT_SETTINGS, AppPaths
 from meshdeck.core.service import CoreService
 
 REANNOUNCE_SECONDS = 5
@@ -32,6 +35,64 @@ SEND_CONCLUDE_TIMEOUT = 90
 
 def jlog(**fields) -> None:
     print(json.dumps({"node": True, **fields}), flush=True)
+
+
+def _split_set_pairs(raw: str) -> list[str]:
+    """Split a comma-separated list of KEY=JSON pairs without breaking JSON.
+
+    Values may be strings with commas or lists/objects (the structured
+    ``interfaces`` setting), so only split on top-level commas outside quotes
+    and outside brackets. This makes ``--set`` usable both repeatedly and as
+    one comma-separated argument (e.g. from the shared launch_node helper,
+    which passes one value per flag)."""
+    pairs: list[str] = []
+    start = 0
+    depth = 0
+    quote: str | None = None
+    escaped = False
+    for index, char in enumerate(raw):
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            continue
+        if char in "\"'":
+            quote = char
+        elif char in "[{":
+            depth += 1
+        elif char in "]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            pairs.append(raw[start:index])
+            start = index + 1
+    pairs.append(raw[start:])
+    return [pair.strip() for pair in pairs if pair.strip()]
+
+
+def parse_set_args(raw_values: list[str]) -> dict[str, Any]:
+    """Parse ``--set KEY=JSON`` arguments into a settings dict.
+
+    Only keys MeshDeck actually defines are accepted: a silent no-op for a
+    typo would turn a boot test green while testing nothing."""
+    seeded: dict[str, Any] = {}
+    for raw in raw_values:
+        for pair in _split_set_pairs(raw):
+            key, separator, raw_value = pair.partition("=")
+            key = key.strip()
+            if not separator or not key:
+                raise SystemExit(f"--set expects KEY=JSON, got {pair!r}")
+            if key not in DEFAULT_SETTINGS:
+                raise SystemExit(f"--set unknown settings key {key!r}")
+            try:
+                seeded[key] = json.loads(raw_value.strip())
+            except json.JSONDecodeError as exc:
+                raise SystemExit(
+                    f"--set {key}: value must be JSON ({exc}): {raw_value.strip()!r}"
+                ) from None
+    return seeded
 
 
 async def run(args: argparse.Namespace) -> int:
@@ -103,12 +164,30 @@ async def run(args: argparse.Namespace) -> int:
     service.bus.subscribe(on_event)
     await service.start()
 
+    # Optional loopback API: lets boot tests assert what the real /node and
+    # /status endpoints report, not just what the harness chose to copy.
+    api_server = None
+    api_port: int | None = None
+    api_token: str | None = None
+
+    async def shutdown() -> None:
+        if api_server is not None:
+            await api_server.stop()
+        await service.stop()
+
+    if args.api_port is not None:
+        from meshdeck.api.server import ApiServer
+        from meshdeck.config import load_or_create_token
+
+        api_token = load_or_create_token(paths.token_path)
+        api_server = ApiServer(service, api_token)
+        api_port = await api_server.start("127.0.0.1", args.api_port)
+        jlog(event="api_ready", port=api_port)
+
     # Seed public identities for peers that are offline and have therefore never
     # announced to this node. Without this, an LXMF send to their address fails
     # with "no_path" before a propagation node ever gets involved.
     if args.seed_peer:
-        import RNS
-
         for spec in args.seed_peer.split(","):
             peer_hash_hex, public_key_hex = spec.split(":", 1)
             public_key = bytes.fromhex(public_key_hex)
@@ -202,7 +281,7 @@ async def run(args: argparse.Namespace) -> int:
                     and watch_path.stat().st_mtime > boot_mtime
                 ):
                     jlog(event="restart_triggered")
-                    await service.stop()
+                    await shutdown()
                     os.execv(sys.executable, [sys.executable, *sys.argv])
                 await asyncio.sleep(0.4)
 
@@ -210,8 +289,41 @@ async def run(args: argparse.Namespace) -> int:
 
     status = service.status()
     info = service.identity_info()
-    info["propagation_hosting"] = status["propagation_hosting"]
-    info["propagation_node_hash"] = status["propagation_node_hash"]
+    settings = service.get_settings()
+    node_info = service.node_info()
+    # The LXMF router's applied outbound propagation node is the runtime truth
+    # behind the persisted `propagation_node_hash` setting (status only exposes
+    # this node's own propagation destination, not the configured peer).
+    router = getattr(service.chat, "_router", None)
+    outbound_propagation_node = (
+        router.get_outbound_propagation_node()
+        if router is not None and hasattr(router, "get_outbound_propagation_node")
+        else None
+    )
+    info.update(
+        {
+            "propagation_hosting": status["propagation_hosting"],
+            "propagation_node_hash": status["propagation_node_hash"],
+            "mode": status["mode"],
+            "transport_enabled": status["transport_enabled"],
+            # Runtime truth from RNS itself (status.transport_enabled only
+            # echoes the settings value). A settings echo cannot catch the bug
+            # class this matrix exists for.
+            "rns_transport_enabled": RNS.Reticulum.transport_enabled(),
+            "interfaces": status["interfaces"],
+            "serve_pages": node_info["serve_pages"],
+            "node_name": node_info["node_name"],
+            "node_hash": node_info["node_hash"],
+            "delivery_method": settings.get("delivery_method"),
+            "propagation_node_setting": settings.get("propagation_node_hash"),
+            "outbound_propagation_node": (
+                outbound_propagation_node.hex() if outbound_propagation_node else ""
+            ),
+        }
+    )
+    if api_port is not None:
+        info["api_port"] = api_port
+        info["api_token"] = api_token
     # Public key lets a peer seed this node's identity while it is offline.
     info["public_key"] = service.identity.identity.get_public_key().hex()
     Path(args.ready_file).write_text(json.dumps(info), encoding="utf-8")
@@ -219,7 +331,7 @@ async def run(args: argparse.Namespace) -> int:
 
     if args.exit_after_ready:
         # Used by the harness to learn a node's addresses, then take it offline.
-        await service.stop()
+        await shutdown()
         return 0
 
     async def announce_loop() -> None:
@@ -314,13 +426,13 @@ async def run(args: argparse.Namespace) -> int:
     while not done_condition.is_set():
         if time.time() > deadline:
             jlog(event="timeout", after=args.timeout)
-            await service.stop()
+            await shutdown()
             return 1
         await asyncio.sleep(0.2)
 
     Path(args.done_file).write_text(json.dumps(result), encoding="utf-8")
     jlog(event="done", **result)
-    await service.stop()
+    await shutdown()
     return return_code[0]
 
 
@@ -374,6 +486,14 @@ def main() -> int:
                         help="write ready.json, stop the service and exit 0")
     parser.add_argument("--sync-retry", action="store_true",
                         help="retry sync_from_propagation_node every few seconds")
+    parser.add_argument("--set", dest="set", action="append", default=[],
+                        metavar="KEY=JSON",
+                        help="seed a setting in the store before CoreService starts "
+                             "(repeatable, or comma-separated KEY=JSON pairs); e.g. "
+                             "--set serve_pages=true --set 'node_name=\"My Node\"'")
+    parser.add_argument("--api-port", type=int, default=None,
+                        help="also start the loopback REST API on this port "
+                             "(0 = ephemeral); port and token go into ready.json")
     parser.add_argument("--ready-file", required=True)
     parser.add_argument("--done-file", required=True)
     parser.add_argument("--timeout", type=int, default=120)
@@ -389,6 +509,7 @@ def main() -> int:
     async def boot() -> int:
         paths = AppPaths(data_dir=Path(args.data_dir))
         paths.ensure()
+        seeded = parse_set_args(args.set)
         if (
             args.extra_config_file
             or args.no_autointerface
@@ -396,6 +517,7 @@ def main() -> int:
             or args.host_propagation
             or args.delivery_method
             or args.propagation_node
+            or seeded
         ):
             from meshdeck.config import SettingsStore
             from meshdeck.storage.db import Database
@@ -415,6 +537,10 @@ def main() -> int:
                 store.set("delivery_method", args.delivery_method)
             if args.propagation_node:
                 store.set("propagation_node_hash", args.propagation_node)
+            # Generic overrides win over the legacy convenience flags so a test
+            # can express exactly the persisted state it wants.
+            for key, value in seeded.items():
+                store.set(key, value)
             db.close()
         return await run(args)
 
