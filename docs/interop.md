@@ -11,7 +11,7 @@ dirs. MeshDeck used the same working tree as the rest of this session.
 | `nomadnet` | **1.4.4** | `pip install nomadnet` |
 | `lxmf` (library + `lxmd` script) | **1.2.1** | dependency of NomadNet / explicit `pip install lxmf` |
 | `rns` | **1.5.7** | dependency of LXMF |
-| MeshDeck | 0.1.1 + Phase 7.1–7.5 working tree | this repo |
+| MeshDeck | **0.2.0** (Phase 7.1–7.6) | this repo |
 
 `pip install nomadnet lxmd` **fails**: `lxmd` is not a PyPI distribution. The
 `lxmd` executable ships with the `lxmf` package (`LXMF.Utilities.lxmd`), so
