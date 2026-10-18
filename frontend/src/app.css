@@ -6,6 +6,9 @@
   --color-wp-panel2: #182430;
   --color-wp-border: #24313d;
   --color-wp-text: #dbe6ee;
+  /* Contrast (WCAG 2.1 relative luminance): #8ca3b2 on wp-panel = 6.81:1,
+     on wp-bg = 7.32:1, on wp-panel2 = 6.00:1 — all ≥ 4.5:1, so the token
+     is unchanged. Re-check with docs/a11y-checklist.md if either value moves. */
   --color-wp-dim: #8ca3b2;
   --color-wp-accent: #35c48d;
   --color-wp-accent2: #46a3ff;
@@ -17,4 +20,26 @@ body {
   background: var(--color-wp-bg);
   color: var(--color-wp-text);
   font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Keyboard focus must always be visible. Form fields additionally swap their
+   border colour on focus (focus:border-wp-accent), so the outline is the
+   fallback for everything else (tabs, icon buttons, links). */
+:focus-visible {
+  outline: 2px solid var(--color-wp-accent);
+  outline-offset: 2px;
+}
+
+/* Respect the OS "reduce motion" setting: no transitions or animations,
+   no smooth scrolling. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }

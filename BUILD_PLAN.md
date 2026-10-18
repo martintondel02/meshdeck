@@ -769,6 +769,12 @@ kill-the-host integration test and a browser run of the cached/stale badges.
 **Phase 4 remaining:** `/media` handler (image conversion needs Pillow;
 deferred), executable pages (deliberately not supported).
 
+**P5.4 done (2026-10-18):** accessibility pass — tablist nav, focus-trapped
+add-peer/onboarding dialogs, keyboard ⋯ menu, aria-labels, polite live
+regions, visible focus ring, reduced-motion support. Contrast verified
+(wp-dim 7.32:1 on wp-bg, 6.81:1 on wp-panel). Screen-reader/keyboard-only
+walkthrough not run; recorded in `docs/a11y-checklist.md`.
+
 **P5.2 done, Flatpak unverified (2026-10-18):** release tarball + genuine
 AppImage + icon/desktop entry + Flatpak manifest. Independently re-verified:
 `sha256sum -c`, tarball contents, and `--version` from both the extracted

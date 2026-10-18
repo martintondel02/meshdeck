@@ -327,6 +327,8 @@
         />
         <button
           onclick={createPage}
+          aria-label="Create page"
+          title="Create page"
           class="bg-wp-accent text-wp-bg text-sm font-semibold px-3 py-1 rounded-lg"
           >＋</button
         >
@@ -349,6 +351,7 @@
               >
               <button
                 class="text-wp-dim hover:text-wp-danger text-xs"
+                aria-label={`Delete page ${p.name}`}
                 title="delete"
                 onclick={() => removePage(p.name)}>✕</button
               >
@@ -396,7 +399,7 @@
         {/if}
       {/if}
       {#if edMsg}
-        <p class="text-xs text-wp-dim">{edMsg}</p>
+        <p class="text-xs text-wp-dim" role="status" aria-live="polite">{edMsg}</p>
       {/if}
     </div>
   </div>
@@ -426,7 +429,9 @@
         class="bg-wp-accent text-wp-bg text-sm font-semibold px-4 py-1.5 rounded-lg"
         >Apply & announce</button
       >
-      {#if hostMsg}<span class="text-xs text-wp-dim">{hostMsg}</span>{/if}
+      {#if hostMsg}
+        <span class="text-xs text-wp-dim" role="status" aria-live="polite">{hostMsg}</span>
+      {/if}
     </div>
   </section>
 
@@ -578,6 +583,7 @@
             >
             <button
               class="text-wp-dim hover:text-wp-danger text-xs"
+              aria-label={`Stop sharing ${f.name}`}
               title="stop sharing"
               onclick={() => unshare(f.name)}>✕</button
             >
@@ -611,7 +617,7 @@
       {/if}
     </div>
     {#if sharedMsg}
-      <p class="text-xs text-wp-dim">{sharedMsg}</p>
+      <p class="text-xs text-wp-dim" role="status" aria-live="polite">{sharedMsg}</p>
     {/if}
   </section>
 </div>

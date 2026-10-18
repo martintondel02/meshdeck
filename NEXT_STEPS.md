@@ -440,7 +440,22 @@ mechanical.
 finds (almost) nothing user-facing; adding a fake `de.ts` with 3 keys proves
 fallback works.
 
-### P5.4 — Accessibility pass
+### P5.4 — Accessibility pass  ✅ DONE (browser/screen-reader walkthrough unverified)
+
+> **Landed (2026-10-18):** real tablist/tabpanel nav with roving tabindex and
+> arrow/Home/End keys; add-peer form as a focus-trapped dialog (autofocus,
+> Escape closes and restores the ＋ trigger) plus a keyboard-navigable ⋯ menu;
+> Onboarding as an `aria-modal` dialog with label association and focus trap;
+> aria-labels for icon-only ＋/⋯/📎 and the Pages/Settings delete/copy
+> buttons; always-mounted polite live regions for peer/chat/onboarding/
+> page/settings statuses; global `:focus-visible` ring;
+> `prefers-reduced-motion` disables transitions and smooth autoscroll.
+> Contrast measured: `wp-dim` #8ca3b2 on `wp-bg` #0b0f14 = 7.32:1, on
+> `wp-panel` #11181f = 6.81:1 (both pass AA; token unchanged).
+> `pnpm run check` 0/0, build green. Checklist: `docs/a11y-checklist.md`.
+> **Unverified:** no screen reader or manual keyboard-only end-to-end run was
+> possible in this environment; the checklist marks those items as not
+> exercised rather than pretending they passed.
 
 **Tasks**
 1. Modals (`PeerList` add-peer, rename; any `confirm()` replacements): focus

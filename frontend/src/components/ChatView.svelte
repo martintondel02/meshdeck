@@ -45,7 +45,11 @@
 
   $effect(() => {
     msgs.length; // scroll on new content
-    scrollBox?.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scrollBox?.scrollTo({
+      top: scrollBox.scrollHeight,
+      behavior: reduce ? "auto" : "smooth",
+    });
   });
 
   async function loadHistory(peerHash: string) {
@@ -66,6 +70,21 @@
         return "✓✓";
       case "failed":
         return "✗";
+      default:
+        return "";
+    }
+  }
+
+  function stateLabel(msg: ChatMessage): string {
+    switch (msg.state) {
+      case "sending":
+        return "sending";
+      case "sent":
+        return "sent";
+      case "delivered":
+        return "delivered";
+      case "failed":
+        return "failed to send";
       default:
         return "";
     }
@@ -202,6 +221,7 @@
       <div class="flex-1"></div>
       <input
         bind:value={search}
+        aria-label="Search message history"
         placeholder="Search history…"
         class="w-44 bg-wp-bg border border-wp-border rounded-lg px-3 py-1 text-xs
                focus:outline-none focus:border-wp-accent"
@@ -230,18 +250,26 @@
                        border border-wp-border hover:border-wp-accent transition-colors group"
                 title="Download {att.name}"
               >
-                <span class="text-base">📎</span>
+                <span class="text-base" aria-hidden="true">📎</span>
+                <span class="sr-only">Download attachment: </span>
                 <span class="truncate font-mono text-xs">{att.name}</span>
                 <span class="text-[11px] text-wp-dim shrink-0">{humanSize(att.size)}</span>
-                <span class="text-wp-accent opacity-0 group-hover:opacity-100 transition shrink-0">⬇</span>
+                <span
+                  class="text-wp-accent opacity-0 group-hover:opacity-100 transition shrink-0"
+                  aria-hidden="true">⬇</span
+                >
               </a>
             {/each}
             <div class="flex items-center gap-1.5 justify-end mt-1 text-[11px] text-wp-dim">
               <span>{clockTime(msg.created_ts)}</span>
               {#if msg.direction === "out"}
-                <span class={msg.state === "failed" ? "text-wp-danger" : msg.state === "delivered" ? "text-wp-accent" : ""}>
+                <span
+                  class={msg.state === "failed" ? "text-wp-danger" : msg.state === "delivered" ? "text-wp-accent" : ""}
+                  aria-hidden="true"
+                >
                   {stateIcon(msg)}
                 </span>
+                <span class="sr-only">{stateLabel(msg)}</span>
                 {#if stateTooltip(msg)}<Tooltip text={stateTooltip(msg)} />{/if}
               {/if}
             </div>
@@ -250,31 +278,42 @@
       {/each}
     </div>
 
-    {#if sendError}
-      <div class="px-5 pb-1 text-xs text-wp-danger flex items-center gap-1">
-        {sendError}
-        {#if sendError === TOOLTIPS.no_path_error}<Tooltip text={TOOLTIPS.announce} />{/if}
-      </div>
-    {/if}
+    <!-- Always mounted so attachment/send errors are announced, even though
+         the visible text only appears when there is an error. -->
+    <div class="px-5" role="status" aria-live="polite" aria-atomic="true">
+      {#if sendError}
+        <div class="pb-1 text-xs text-wp-danger flex items-center gap-1">
+          {sendError}
+          {#if sendError === TOOLTIPS.no_path_error}<Tooltip text={TOOLTIPS.announce} />{/if}
+        </div>
+      {/if}
+    </div>
 
     <div class="p-4 border-t border-wp-border flex gap-2 items-center">
       <input
         bind:this={fileInput}
         type="file"
         class="hidden"
+        aria-hidden="true"
+        tabindex="-1"
         onchange={sendSelectedFile}
       />
       <button
         onclick={() => fileInput?.click()}
         disabled={fileSending}
+        aria-label={fileSending
+          ? "Sending attachment…"
+          : `Attach a file (up to ${humanSize(MAX_ATTACHMENT_BYTES)})`}
+        aria-busy={fileSending}
         class="bg-wp-panel2 border border-wp-border rounded-xl px-3.5 py-2.5
                hover:border-wp-accent transition disabled:opacity-40"
         title="Send a file (up to {humanSize(MAX_ATTACHMENT_BYTES)})"
       >
-        {fileSending ? "⏳" : "📎"}
+        <span aria-hidden="true">{fileSending ? "⏳" : "📎"}</span>
       </button>
       <input
         bind:value={draft}
+        aria-label="Message text (Enter to send)"
         onkeydown={(e) => e.key === "Enter" && send()}
         placeholder="Type a message… (or attach a file)"
         class="flex-1 bg-wp-bg border border-wp-border rounded-xl px-4 py-2.5

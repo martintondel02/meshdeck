@@ -4,6 +4,16 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added (Phase 5 — accessibility)
+
+- Keyboard and screen-reader pass: the top nav is a real tablist (arrow /
+  Home / End), the add-peer form and Onboarding are focus-trapped dialogs
+  (autofocus, Escape restores focus), the peer ⋯ menu is keyboard-navigable,
+  icon-only buttons have labels, status messages are polite live regions, and
+  reduced-motion preferences disable transitions/autoscroll. Contrast checked
+  (wp-dim ≥ 6.8:1 on panels). Checklist in `docs/a11y-checklist.md`;
+  screen-reader walkthrough remains unverified.
+
 ### Added (Phase 5 — release artifacts)
 
 - `packaging/release.sh`: builds the UI + one-file binary and produces
