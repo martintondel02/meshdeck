@@ -2,7 +2,7 @@
 
 All notable changes to MeshDeck. Format based on Keep a Changelog.
 
-## [Unreleased]
+## [0.2.0] - 2026-10-19
 
 ### Added (Phase 7.1 — bounded remaining stores)
 
@@ -136,6 +136,49 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
   is the working command.
 - Not tested: Sideband/Android, NomadNet's TUI browser, lxmd autopeering,
   large transfers, stamp costs above the minimum, cross-platform binaries.
+
+### Changed
+
+- Flatpak runtime moved from the end-of-life `24.08` to `26.08`, and the build
+  sandbox now gets network access for `pip` (`build-options.build-args:
+  [--share=network]`).
+- The PyInstaller spec is now `packaging/pyinstaller.spec`; the historical
+  `packaging/meshdeck.spec` name is the **RPM** spec (`make package` follows
+  the rename).
+- README's two-instance instructions now document the same-host AutoInterface
+  multicast contention and the loopback TCP-pair workaround.
+
+### Fixed
+
+- aiohttp's default 1 MiB request-body limit rejected legitimate payloads below
+  the documented caps (4 MiB pages, up to 32 MiB shared files) with `413`
+  before the stores could enforce their real limits. The API now accepts the
+  largest documented payload plus multipart overhead.
+- Attachment retention now removes empty peer/message directories correctly
+  (the previous `os.walk` check used a stale directory list).
+- The README's fresh-clone second-instance command could never reach
+  `rns_running` on one host because both instances defaulted to AutoInterface;
+  the measured run exposed it and the instructions were corrected.
+
+### Known limitations / unverified (0.2.0)
+
+- **Flatpak networking:** the app builds, installs and serves UI+API, but the
+  default AutoInterface does not start inside the Flatpak sandbox on this host
+  (RNS exits 255 before logging a reason). Flatpak network discovery is
+  **unverified**; disable AutoInterface or configure TCP for now.
+- **Screen reader:** Orca 50.3 attached to Chromium and its debug log shows
+  generated utterances, but no human listener heard or validated them.
+- **Fresh-clone onboarding:** 9.3 s end-to-end with warm pip/pnpm caches and
+  the loopback workaround, not a human stranger on a cold machine.
+- **Interop not tested:** Sideband/Android/iOS, NomadNet's TUI browser (only a
+  protocol-level RNS client was used for MeshDeck→client), lxmd autopeering,
+  large interop transfers, stamp costs above the minimum 13, Windows/macOS.
+- **RPM:** unsigned and built for this host's glibc/architecture; not portable
+  to older distributions. No Windows/macOS binaries.
+- **Message history retention does not VACUUM**; the database file is not
+  compacted automatically (documented in `docs/handoffs/storage-bounds.md`).
+- **Propagation store cap is periodic** (LXMF's own clean job, ~2 minutes), not
+  instant.
 
 ## [0.1.1] - 2026-10-19
 

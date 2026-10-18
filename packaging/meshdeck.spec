@@ -8,7 +8,7 @@
 # The version comes from meshdeck/version.py via --define on the rpmbuild
 # command line (single source of truth); the fallback below only keeps the spec
 # syntactically usable with plain `rpmspec`.
-%{!?meshdeck_version:%global meshdeck_version 0.1.1}
+%{!?meshdeck_version:%global meshdeck_version 0.2.0}
 
 Name:           meshdeck
 Version:        %{meshdeck_version}
@@ -54,5 +54,5 @@ install -Dm 0644 README.md %{buildroot}%{_docdir}/meshdeck/README.md
 %license LICENSE
 
 %changelog
-* Mon Oct 19 2026 MeshDeck contributors <noreply@example.invalid> - 0.1.1-1
-- Initial RPM packaging for the MeshDeck one-file release binary.
+* Mon Oct 19 2026 MeshDeck contributors <noreply@example.invalid> - 0.2.0-1
+- MeshDeck 0.2.0: bounded stores, propagation dashboard, RPM packaging.

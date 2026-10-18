@@ -680,10 +680,56 @@ phase; Playwright optional from Phase 5.
     identity fails with `KeyError: Signing failed because identity does not
     hold a private key` and stores nothing. End-to-end test:
     `tests/integration/test_propagation.py`.
+26. **aiohttp's default request-body limit is 1 MiB.** It rejects a legitimate
+    4 MiB page PUT or a shared-file upload below the documented 32 MiB cap with
+    `413` before the store layer can enforce its own limit. `ApiServer.build_app`
+    sets `client_max_size=MAX_SHARED_BYTES + 1 MiB`; the store caps remain the
+    real bound. Found while writing the Phase 7.1 API test.
+27. **Two Reticulum instances on one host contend for AutoInterface's multicast
+    socket.** The second MeshDeck process can sit at "Starting…" forever
+    (`rns_running` never true). The README now tells readers to use a loopback
+    TCP server/client pair for same-host tests. Found by the Phase 7.3 timed
+    fresh-clone run.
+28. **flatpak-builder disables network in the build sandbox.** `pip install`
+    inside a `buildsystem: simple` module fails with DNS errors unless the
+    manifest sets `build-options.build-args: [--share=network]`. Separately,
+    `org.flatpak.Builder` installed user-level needed `--filesystem=/tmp` to
+    see a host build tree, and an extracted host `flatpak-builder` worked
+    around a Builder-sandbox SDK lookup. Documented in `packaging/README.md`.
+29. **AutoInterface does not start inside the Flatpak sandbox on this host:**
+    `RNS.Reticulum` exits 255 before writing a log line. The app serves UI/API
+    with AutoInterface disabled or a TCP interface; Flatpak network discovery
+    is unverified.
+30. **Pruning empty directories with `os.walk(topdown=False)`'s captured
+    `dirs` list is wrong.** The list was built before children were removed, so
+    an emptied `peer/msg` parent still looked non-empty. Check
+    `any(path.iterdir())` instead (Phase 7.1 attachment prune).
 
 ---
 
 ## 15. Build order checklist (execute in order; commit per step)
+
+**Phase 7 — 0.2.0 verification and bounding — DONE 2026-10-19 (v0.2.0).**
+(7.1) Bounded every remaining local store: attachment blobs (512 MiB default +
+optional age retention, message rows kept, tombstone UI + `attachment_pruned`
+404), shared files (1024 MiB) and hosted pages (256 MiB) refuse new writes above
+the cap and are never auto-deleted, message-history retention (boot + daily,
+peers/nodes kept, no automatic VACUUM), startup log rotation with one `.1`
+backup. New settings strictly validated (400, never clamped) and every usage
+line shown in Settings. Found and fixed aiohttp's 1 MiB body limit (§14.26).
+(7.2) Fedora RPM via `packaging/meshdeck.spec` + `rpm.sh`, including a
+user-level rpmbuild bootstrap; verified with `rpm -qip`/`-qlp` and extraction.
+(7.3) Keyboard-only walkthrough on two real daemons (9/9, 0 console errors),
+Orca 50.3 screen-reader attempt (utterances generated, not heard), Flatpak
+build/install/serve on 26.08 (AutoInterface caveat), timed fresh-clone run
+(9.3 s; README two-instance bug fixed). (7.4) Interop with real NomadNet 1.4.4
+and official lxmf 1.2.1/lxmd: pages both ways, direct messages both ways,
+lxmd store-and-forward, MeshDeck hosting with an independent sender/receiver.
+(7.5) `GET /api/v1/propagation` + operator dashboard with store/counters/uptime/
+transfer state, defensive torn reads. (7.6) Rebuilt tarball/AppImage/RPM from
+the tagged tree, verified checksums + `--version` + extracted RPM + UI/API,
+tagged `v0.2.0` and published the GitHub release. Test counts and CI evidence
+are in `docs/handoffs/phase-7-release.md` and the release report.
 
 **Phase 6 — post-v0.1.0 hardening — DONE 2026-10-19 (v0.1.1).** Three parallel
 PRs: (1) HTTP route contract tests against real CLI daemons; (2) a

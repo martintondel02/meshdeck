@@ -6,7 +6,7 @@ This directory contains the release packaging assets. The version is read from
 
 ## Status summary
 
-Verified on **Fedora Linux 44 x86_64** (glibc 2.43) on 2026-10-18, with
+Verified on **Fedora Linux 44 x86_64** (glibc 2.43) on 2026-10-19, with
 PyInstaller 6.22.3 / Python 3.14.8:
 
 | Method | Command | Status |
@@ -46,7 +46,7 @@ Install for the current user (`Exec=meshdeck` requires `~/.local/bin` on
 `PATH`):
 
 ```bash
-VERSION=0.1.0.dev0
+VERSION=0.2.0
 tar -xzf dist/meshdeck-$VERSION-x86_64.tar.gz
 install -m 0755 meshdeck-$VERSION-x86_64/meshdeck ~/.local/bin/meshdeck
 install -Dm 0644 meshdeck-$VERSION-x86_64/meshdeck.desktop \
@@ -111,7 +111,7 @@ ls squashfs-root/AppRun squashfs-root/usr/bin/meshdeck
 ```
 
 On this host the AppImage was launched directly (FUSE available), reported
-`meshdeck 0.1.0.dev0`, and served `GET /` and `GET /api/v1/status` with `200`.
+`meshdeck 0.2.0`, and served `GET /` and `GET /api/v1/status` with `200`.
 The build warns that AppStream metadata is missing; that is cosmetic. Without
 FUSE, run it with `APPIMAGE_EXTRACT_AND_RUN=1`.
 
@@ -154,7 +154,7 @@ subpackage (`%global debug_package %{nil}`) because there is no source build.
 Exact verification recipe:
 
 ```bash
-VERSION=0.1.1
+VERSION=0.2.0
 ARCH=$(uname -m)
 rpm -qip dist/meshdeck-$VERSION-1.$ARCH.rpm
 rpm -qlp dist/meshdeck-$VERSION-1.$ARCH.rpm
@@ -163,13 +163,13 @@ TMP=$(mktemp -d)
 "$TMP"/usr/bin/meshdeck --version
 ```
 
-Verified here: `rpm -qip` reports `Version: 0.1.1`, `License: MIT`,
+Verified here: `rpm -qip` reports `Version: 0.2.0`, `License: MIT`,
 `Signature: (none)`; `rpm -qlp` lists `/usr/bin/meshdeck`,
 `/usr/share/applications/meshdeck.desktop`,
 `/usr/share/icons/hicolor/scalable/apps/meshdeck.svg`,
-`/usr/share/doc/meshdeck/README.md`, `/usr/share/licenses/meshdeck-0.1.1/LICENSE`;
-the extracted binary prints `meshdeck 0.1.1`. The artifact is
-`meshdeck-0.1.1-1.x86_64.rpm` (~23 MB).
+`/usr/share/doc/meshdeck/README.md`, `/usr/share/licenses/meshdeck-0.2.0/LICENSE`;
+the extracted binary prints `meshdeck 0.2.0`. The artifact is
+`meshdeck-0.2.0-1.x86_64.rpm` (~23 MB).
 
 ## Flatpak (verified, with a networking caveat)
 
@@ -206,10 +206,10 @@ flatpak install --user -y flathub \
 flatpak run --filesystem=/tmp --command=flatpak-builder org.flatpak.Builder \
     --user --install --force-clean --state-dir=/tmp/flatpak-state \
     /tmp/flatpak-build /tmp/flatpak-src/packaging/flatpak/org.meshdeck.MeshDeck.yml
-flatpak run org.meshdeck.MeshDeck --version       # -> meshdeck 0.1.1
+flatpak run org.meshdeck.MeshDeck --version       # -> meshdeck 0.2.0
 ```
 
-Verified: build + install succeeded; `--version` printed `meshdeck 0.1.1`; with
+Verified: build + install succeeded; `--version` printed `meshdeck 0.2.0`; with
 `connect_autointerface=false` seeded into the app's data dir, `flatpak run
 org.meshdeck.MeshDeck --port 18998` served `GET /` → **200** and authenticated
 `GET /api/v1/status` → **200** (`rns_running: true`).

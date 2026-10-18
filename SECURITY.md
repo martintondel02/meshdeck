@@ -34,11 +34,12 @@ instance and your own nodes, not against other people's infrastructure.
 
 | Version | Supported |
 |---|---|
-| `0.1.1` (latest tagged release) | Yes |
+| `0.2.0` (latest tagged release) | Yes |
+| `0.1.1` (previous release) | Best effort |
 | `main` (development) | Best effort |
 | Any earlier commit or pre-release | No |
 
-`v0.1.1` is the latest tagged release (v0.1.0 was the first). Fixes land on
+`v0.2.0` is the latest tagged release (`v0.1.0` was the first). Fixes land on
 `main` and are released in the next tag; there are no backport branches for
 pre-1.0 releases.
 

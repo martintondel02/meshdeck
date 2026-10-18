@@ -7,14 +7,17 @@
 > and network infrastructure behind a browser UI — with a basic mode for people
 > who just want to talk, and an advanced mode for people who want the knobs.
 
-**Status: v0.1.1 (first release series).** Chat, contacts, attachments, page hosting
-and browsing with an offline cache, shared node files, transfer progress,
-propagation-node hosting, the interface editor and an English-only i18n
-foundation are implemented and covered by unit + integration tests. Prebuilt
-Linux x86_64 artifacts (tarball and AppImage, with checksums) are attached to
-the [v0.1.1 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.1);
-Flatpak remains an unverified manifest. UI and copy may still change. The live
-task list is [NEXT_STEPS.md](NEXT_STEPS.md); the design record is
+**Status: v0.2.0.** Chat, contacts, attachments (bounded, with optional
+retention), page hosting and browsing with an offline cache, shared node files
+(capped), transfer progress, propagation-node hosting with an operator
+dashboard, the interface editor and an English-only i18n foundation are
+implemented and covered by unit + integration + opt-in interop tests. Every
+local store has an explicit ceiling, visible in Settings. Prebuilt Linux x86_64
+artifacts (tarball, AppImage and RPM, with checksums) are attached to the
+[v0.2.0 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.2.0);
+Flatpak builds and serves the UI/API but its default AutoInterface is unverified
+inside the sandbox. UI and copy may still change. The live task list is
+[NEXT_STEPS.md](NEXT_STEPS.md); the design record is
 [BUILD_PLAN.md](BUILD_PLAN.md).
 
 MeshDeck is free and open-source (MIT), built on the reference
@@ -32,17 +35,25 @@ traffic you configure, nothing leaves your machine.
 
 | Area | Basic mode | Advanced mode adds |
 |---|---|---|
-| Chat | 1:1 LXMF messages, delivery ticks, in-conversation search, attachments up to 1.5 MiB per message, automatic stamps when a peer requires them | Direct / opportunistic / propagated delivery and a propagation-node address |
+| Chat | 1:1 LXMF messages, delivery ticks, in-conversation search, attachments up to 1.5 MiB per message with a global attachment cap and optional age retention, automatic stamps when a peer requires them | Direct / opportunistic / propagated delivery and a propagation-node address |
 | Contacts | Auto-discovery from announces, add by address, rename, block | — (same) |
 | Pages & node | Create, edit, preview and host micron pages; browse other nodes by address, with a cached copy when a node is unreachable; share files up to 32 MiB | — (same; the Pages tab is available in both modes) |
+| Storage | Page cache and attachments capped and pruned by explicit policy; history/log retention settings; every usage shown before it can delete anything | Per-store limits, retention days, Clear cache |
 | Interfaces | AutoInterface on by default | Editor for Auto, TCP client/server and Backbone client/server interfaces, listen address and port, gateway mode, automatic announce-rate presets for public listeners |
-| Infrastructure | — | Transport-node toggle; propagation-node hosting with a configurable disk cap and usage display |
+| Infrastructure | — | Transport-node toggle; propagation-node hosting with a configurable store cap, served/received counters, stored-message count, uptime and a Refresh-able operator dashboard |
 | Network status | Connected state, interface count, "announce now" | Live interface table (type, online, bitrate), config pre-flight before a restart, glossary |
 | Help | Built-in Guides tab and inline tooltips | Same, plus a technical glossary |
 
 Advanced mode is a display filter, not a security boundary. File-size caps and
 page validation are enforced by the backend in both modes. The 512 KiB renderer
 cap protects the browser from oversized pages.
+
+Interoperability was verified against independent binaries: real
+**NomadNet 1.4.4** (hosting a page MeshDeck browses), **lxmd/official lxmf
+1.2.1** (direct messages both ways, a propagation node storing a message for an
+offline peer, and MeshDeck hosting with an independent sender/receiver). See
+[docs/interop.md](docs/interop.md) for versions, evidence and the untested list
+(Sideband/Android, NomadNet's TUI, autopeering).
 
 ## Screenshots
 
@@ -99,19 +110,20 @@ address from one instance's Settings screen in the other's "add peer" field.
 
 ### Or download a release binary
 
-The [v0.1.1 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.1)
+The [v0.2.0 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.2.0)
 ships three Linux x86_64 artifacts, with `SHA256SUMS`:
 
-- `meshdeck-0.1.1-x86_64.tar.gz` — extract and run the `meshdeck` binary inside
-- `meshdeck-0.1.1-x86_64.AppImage` — `chmod +x` and run it directly
-- `meshdeck-0.1.1-1.x86_64.rpm` — Fedora/RHEL-family package:
-  `sudo dnf install ./meshdeck-0.1.1-1.x86_64.rpm`
+- `meshdeck-0.2.0-x86_64.tar.gz` — extract and run the `meshdeck` binary inside
+- `meshdeck-0.2.0-x86_64.AppImage` — `chmod +x` and run it directly
+- `meshdeck-0.2.0-1.x86_64.rpm` — Fedora/RHEL-family package:
+  `sudo dnf install ./meshdeck-0.2.0-1.x86_64.rpm`
 
 All three embed the web UI, so none needs Python installed. The RPM is
 unsigned and, like the other binaries, built against this host's glibc; it
-targets Fedora-family systems of the same architecture. Flatpak is **not**
-published: the manifest in `packaging/flatpak/` has never been built
-(`flatpak-builder` was unavailable), and `packaging/README.md` says so.
+targets Fedora-family systems of the same architecture. Flatpak builds,
+installs and serves the UI/API on this host, but the default AutoInterface does
+not start inside its sandbox, so Flatpak networking is not verified. See
+`packaging/README.md` for every artifact's status.
 
 To build it yourself instead:
 

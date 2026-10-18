@@ -699,3 +699,66 @@ in `/status` and Settings, with Clear cache. Limits reject invalid input with
   `docs/interop.md` has versions, evidence and the untested list (Sideband,
   Android, NomadNet TUI, autopeering, large transfers). Opt-in tests:
   `tests/interop/` (`-m interop`).
+
+---
+
+## 8. Phase 7 — v0.2.0 release (2026-10-19)
+
+Base `31d8fbb` (v0.1.1). Everything below was run in this session; the release
+gate is the tagged commit.
+
+### Shipped
+
+- **7.1 Bounded stores:** attachments (512 MiB default + optional retention,
+  blobs only, tombstone UI/`attachment_pruned` 404), shared files (1024 MiB) and
+  hosted pages (256 MiB) refuse new writes over cap and are never auto-deleted,
+  message retention (boot + daily, peers/nodes kept, no automatic VACUUM),
+  startup log rotation (one `.1`). Strict 400 validation; all usage in
+  `/status`, `/settings` and Settings → Storage. Fixed aiohttp's 1 MiB body
+  limit that rejected legitimate 4 MiB pages / large shared uploads.
+- **7.2 RPM:** `packaging/meshdeck.spec` + `rpm.sh`, user-level rpmbuild route,
+  auto ELF Requires kept, `rpm -qip`/`-qlp` and extracted `--version` verified.
+- **7.3 Verification:** keyboard-only walkthrough 9/9 on two real daemons
+  (0 console errors, delivery checked on the second daemon); Orca 50.3 attached
+  and generated utterances (not heard by a human); Flatpak 26.08 built,
+  installed, `--version`, UI+API served (AutoInterface caveat); timed
+  fresh-clone run 9.3 s with the README two-instance bug fixed.
+- **7.4 Interop:** real NomadNet 1.4.4 (hosts → MeshDeck browses), MeshDeck
+  hosts → independent official-RNS client (protocol-level), official lxmf 1.2.1
+  direct both ways, `lxmd` propagation store-and-forward, MeshDeck PN with
+  independent sender/receiver. `docs/interop.md` + opt-in `tests/interop/`.
+- **7.5 Dashboard:** `GET /api/v1/propagation` and Settings operator dashboard
+  (hosting, store used/limit, stored messages, served/received, unpeered,
+  peers, uptime, transfer state, Refresh), defensive torn reads.
+- **7.6 Release:** version 0.2.0, changelog, README/SECURITY/BUILD_PLAN/docs,
+  rebuilt and verified all artifacts, tag + GitHub release.
+
+### Verified
+
+| Item | Evidence |
+|---|---|
+| Unit tests | **160 passed** (0.47 s) |
+| API + integration | **26 passed** (~84 s), real subprocesses/HTTP |
+| Frontend | `pnpm run check` 0/0, **37 vitest**, build green |
+| Interop (opt-in) | **4 passed** (76 s) against nomadnet 1.4.4 / lxmf 1.2.1 / lxmd |
+| Keyboard-only | 9/9 steps, 0 console errors, cross-daemon delivery |
+| Orca | attached to Chromium, 154 script activations, speech utterances logged |
+| Flatpak | build + install + `--version` + UI/API 200 on 26.08 |
+| Fresh clone | clone → two instances → text+file = **9.3 s** (warm caches) |
+| Artifacts | tarball, AppImage, RPM rebuilt; `sha256sum -c`; each `--version`; RPM extracted and run |
+| Release | assets re-downloaded, checksums/versions re-checked, UI+API served |
+
+### Unverified / limitations (must stay honest)
+
+- **Flatpak AutoInterface** does not start in the sandbox (RNS exit 255);
+  Flatpak network discovery is unverified.
+- **Screen-reader announcements** were generated but never heard/validated by a
+  person; only the Orca debug log proves utterances.
+- **Fresh-clone timing** is not a human stranger on a cold machine; pip/pnpm
+  caches were warm.
+- **Interop not tested:** Sideband/Android/iOS, NomadNet's TUI browser (only a
+  protocol-level RNS client), lxmd autopeering, large interop transfers, stamp
+  costs above the minimum 13, Windows/macOS.
+- **RPM** is unsigned and targets this host's glibc/architecture.
+- Message retention does not VACUUM; propagation-store enforcement is periodic
+  (~2 min); no Windows/macOS builds.
