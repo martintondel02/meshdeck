@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -560,38 +561,122 @@ class CoreService:
             raise ValueError("not_found")
         return data, name
 
+    def _transfer_emitter(
+        self, transfer_id: str | None, path: str, kind: str
+    ) -> Callable[[float], None] | None:
+        """Throttled progress callback for the WS transfer events.
+
+        Runs on an RNS worker thread (link.request's progress callback), so it
+        must only ever use EventBus.publish_from_thread. Throttled to 10 %
+        deltas or 250 ms so a fast 8 MiB file cannot flood the socket.
+        """
+        if not transfer_id:
+            return None
+        state = {"progress": -1.0, "ts": 0.0}
+
+        def emit(fraction: float) -> None:
+            progress = max(0.0, min(1.0, float(fraction)))
+            now = time.time()
+            if (
+                progress < 1.0
+                and progress - state["progress"] < 0.10
+                and now - state["ts"] < 0.25
+            ):
+                return
+            state["progress"] = progress
+            state["ts"] = now
+            self.bus.publish_from_thread(
+                "transfer_progress",
+                {
+                    "id": transfer_id,
+                    "path": path,
+                    "progress": round(progress, 3),
+                    "kind": kind,
+                },
+            )
+
+        return emit
+
+    def _transfer_failed(
+        self, transfer_id: str | None, path: str, error: str
+    ) -> None:
+        if transfer_id:
+            self.bus.publish(
+                "transfer_failed",
+                {"id": transfer_id, "path": path, "error": error},
+            )
+
     async def download_shared(
-        self, node_hash: str, name: str
+        self,
+        node_hash: str,
+        name: str,
+        transfer_id: str | None = None,
     ) -> tuple[bytes, str, float]:
         """Fetch a file hosted on another node; returns (bytes, name, elapsed)."""
+        path = f"/file/{name}"
         started = time.time()
+        progress = self._transfer_emitter(transfer_id, path, "file")
         try:
             data = await asyncio.wait_for(
-                asyncio.to_thread(fetch_file, node_hash, name), timeout=120
+                asyncio.to_thread(fetch_file, node_hash, name, progress_cb=progress),
+                timeout=120,
             )
         except PageFetchError as exc:
+            self._transfer_failed(transfer_id, path, str(exc))
             raise ValueError(str(exc)) from None
         except TimeoutError:
+            self._transfer_failed(transfer_id, path, "link_timeout")
             raise ValueError("link_timeout") from None
-        return data, name, round((time.time() - started) * 1000, 1)
+        elapsed = round((time.time() - started) * 1000, 1)
+        if transfer_id:
+            self.bus.publish(
+                "transfer_complete",
+                {
+                    "id": transfer_id,
+                    "path": path,
+                    "name": name,
+                    "bytes": len(data),
+                    "elapsed_ms": elapsed,
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                },
+            )
+        return data, name, elapsed
 
     async def browse_page(
-        self, node_hash: str, path: str
+        self,
+        node_hash: str,
+        path: str,
+        transfer_id: str | None = None,
     ) -> dict[str, Any]:
         path = normalize_page_path(path)
         started = time.time()
+        progress = self._transfer_emitter(transfer_id, path, "page")
         try:
             data = await asyncio.wait_for(
-                asyncio.to_thread(fetch_page, node_hash, path), timeout=40
+                asyncio.to_thread(fetch_page, node_hash, path, progress_cb=progress),
+                timeout=40,
             )
         except PageFetchError as exc:
+            self._transfer_failed(transfer_id, path, str(exc))
             raise ValueError(str(exc)) from None
         except TimeoutError:
+            self._transfer_failed(transfer_id, path, "link_timeout")
             raise ValueError("link_timeout") from None
+        elapsed = round((time.time() - started) * 1000, 1)
+        if transfer_id:
+            self.bus.publish(
+                "transfer_complete",
+                {
+                    "id": transfer_id,
+                    "path": path,
+                    "bytes": len(data),
+                    "elapsed_ms": elapsed,
+                },
+            )
         return {
             "node_hash": node_hash,
             "path": path,
             "content": data.decode("utf-8", "replace"),
             "bytes": len(data),
-            "elapsed_ms": round((time.time() - started) * 1000, 1),
+            "elapsed_ms": elapsed,
         }

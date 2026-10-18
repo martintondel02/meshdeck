@@ -333,7 +333,9 @@ class ApiServer:
     async def _browse_page(self, request: web.Request) -> web.Response:
         return _json(
             await self.service.browse_page(
-                request.match_info["hash"], request.match_info["path"]
+                request.match_info["hash"],
+                request.match_info["path"],
+                transfer_id=request.query.get("transfer_id") or None,
             )
         )
 
@@ -373,7 +375,9 @@ class ApiServer:
 
     async def _browse_file(self, request: web.Request) -> web.Response:
         data, name, _elapsed = await self.service.download_shared(
-            request.match_info["hash"], request.match_info["name"]
+            request.match_info["hash"],
+            request.match_info["name"],
+            transfer_id=request.query.get("transfer_id") or None,
         )
         return _binary_response(data, name)
 

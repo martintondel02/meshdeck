@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 
 import RNS
 
@@ -42,6 +43,7 @@ def fetch_path(
     path: str,
     timeout: float = DEFAULT_TIMEOUT,
     max_response_bytes: int = MAX_RESPONSE_BYTES,
+    progress_cb: Callable[[float], None] | None = None,
 ) -> bytes:
     """Blocking fetch of any node request path over an RNS Link.
 
@@ -71,12 +73,23 @@ def fetch_path(
         finally:
             raise PageFetchError("link_timeout") from None
 
+    def _on_progress(receipt) -> None:
+        # Runs on an RNS worker thread. A raising callback aborts the transfer,
+        # so user code (which may publish to the EventBus) is isolated here.
+        if progress_cb is None:
+            return
+        try:
+            progress_cb(float(receipt.progress))
+        except Exception:  # noqa: BLE001
+            log.warning("transfer progress callback failed", exc_info=True)
+
     try:
         receipt = link.request(
             path,
             data={},
             timeout=timeout,
             max_response_size=max_response_bytes,
+            progress_callback=_on_progress,
         )
         if receipt is False:
             raise PageFetchError("request_failed")
@@ -100,16 +113,20 @@ def fetch_path(
 
 
 def fetch_page(
-    node_hash_hex: str, path: str = "/page/index.mu", timeout: float = DEFAULT_TIMEOUT
+    node_hash_hex: str,
+    path: str = "/page/index.mu",
+    timeout: float = DEFAULT_TIMEOUT,
+    progress_cb: Callable[[float], None] | None = None,
 ) -> bytes:
     """Blocking fetch of a page from a nomadnetwork.node destination."""
-    return fetch_path(node_hash_hex, path, timeout=timeout)
+    return fetch_path(node_hash_hex, path, timeout=timeout, progress_cb=progress_cb)
 
 
 def fetch_file(
     node_hash_hex: str,
     name: str,
     timeout: float = DEFAULT_TIMEOUT,
+    progress_cb: Callable[[float], None] | None = None,
 ) -> bytes:
     """Blocking download of a shared file (/file/<name>) from a node."""
     return fetch_path(
@@ -117,4 +134,5 @@ def fetch_file(
         f"/file/{name}",
         timeout=timeout,
         max_response_bytes=MAX_FILE_BYTES,
+        progress_cb=progress_cb,
     )

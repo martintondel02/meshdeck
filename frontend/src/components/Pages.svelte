@@ -2,11 +2,13 @@
   import { onMount } from "svelte";
   import { api, downloadBlob, uploadFile } from "../lib/api";
   import Tooltip from "./Tooltip.svelte";
+  import TransferBar from "./TransferBar.svelte";
   import {
     humanSize,
     nodeInfo,
     nodes,
     pages,
+    transfers,
     type BrowseResult,
     type NodeInfo,
     type NodeMeta,
@@ -36,6 +38,24 @@
   let browseErr = $state("");
   let pageResult = $state<BrowseResult | null>(null);
   let back = $state<{ hash: string; path: string }[]>([]);
+  let transferId = $state<string | null>(null);
+  let fileTransferId = $state<string | null>(null);
+  let fileBusy = $state(false);
+
+  function newId(): string {
+    return crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  }
+
+  // Register the transfer locally so the bar is visible before the first
+  // progress event arrives over the WebSocket.
+  function beginTransfer(kind: "page" | "file", path: string): string {
+    const id = newId();
+    transfers.update((all) => ({
+      ...all,
+      [id]: { id, path, kind, progress: 0, done: false },
+    }));
+    return id;
+  }
 
   onMount(() => {
     loadAll();
@@ -142,9 +162,10 @@
     browsing = true;
     browseErr = "";
     pageResult = null;
+    transferId = beginTransfer("page", path);
     try {
       pageResult = await api<BrowseResult>(
-        `/api/v1/browse/${encodeURIComponent(node)}${path}`,
+        `/api/v1/browse/${encodeURIComponent(node)}${path}?transfer_id=${encodeURIComponent(transferId)}`,
       );
     } catch (e) {
       browseErr = browseErrorText(e);
@@ -247,14 +268,19 @@
   async function downloadFromNode() {
     sharedMsg = "";
     if (!dlNode.trim() || !dlName.trim()) return;
+    const name = dlName.trim();
+    fileBusy = true;
+    fileTransferId = beginTransfer("file", `/file/${name}`);
     try {
       await downloadBlob(
-        `/api/v1/browse/${encodeURIComponent(dlNode.trim())}/file/${encodeURIComponent(dlName.trim())}`,
-        dlName.trim(),
+        `/api/v1/browse/${encodeURIComponent(dlNode.trim())}/file/${encodeURIComponent(name)}?transfer_id=${encodeURIComponent(fileTransferId)}`,
+        name,
       );
       sharedMsg = "download started";
     } catch (e) {
       sharedMsg = browseErrorText(e);
+    } finally {
+      fileBusy = false;
     }
   }
 
@@ -444,6 +470,9 @@
         >{browsing ? "fetching…" : "Open"}</button
       >
     </div>
+    {#if browsing && transferId}
+      <TransferBar transfer={$transfers[transferId]} />
+    {/if}
     {#if browseErr}
       <p class="text-xs text-wp-danger">{browseErr}</p>
     {/if}
@@ -549,11 +578,14 @@
         />
         <button
           onclick={downloadFromNode}
-          disabled={!dlNode.trim() || !dlName.trim()}
+          disabled={fileBusy || !dlNode.trim() || !dlName.trim()}
           class="bg-wp-accent text-wp-bg text-sm font-semibold px-4 py-1.5 rounded-lg"
           >Get file</button
         >
       </div>
+      {#if fileBusy && fileTransferId}
+        <TransferBar transfer={$transfers[fileTransferId]} />
+      {/if}
     </div>
     {#if sharedMsg}
       <p class="text-xs text-wp-dim">{sharedMsg}</p>

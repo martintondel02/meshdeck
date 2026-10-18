@@ -89,7 +89,8 @@ GET    /shared                POST /shared (multipart) GET/DELETE /shared/{name}
 GET    /browse/{hash}/file/{name}
 GET/PUT /settings             POST /announce          POST /restart
 /ws (hello frame, {type:cmd}, events: peer_announced, message_received,
-     message_state, node_announced, settings_updated, restart_scheduled)
+     message_state, node_announced, settings_updated, restart_scheduled,
+     transfer_progress, transfer_complete, transfer_failed)
 ```
 
 ### Frontend (`frontend/src/`)
@@ -124,7 +125,20 @@ UI embedded). `packaging/meshdeck_main.py` force-binds `RNS.Interfaces` modules
 Goal: pages/files feel finished on slow links and unreliable peers, and the
 node is useful as infrastructure, not just a demo.
 
-### P4.1 — Transfer progress for large responses  ★ highest value
+### P4.1 — Transfer progress for large responses  ★ highest value  ✅ DONE
+
+> **Landed (2026-10-18):** `pages/client.fetch_path/fetch_page/fetch_file`
+> take a `progress_cb` (wrapped so a raising callback cannot abort the
+> transfer); `CoreService` throttles it to 10 % / 250 ms and publishes
+> `transfer_progress` via `publish_from_thread` from the RNS thread, then
+> `transfer_complete` (with SHA-256 for files) or `transfer_failed`.
+> `?transfer_id=` accepted on both browse routes; WS store + thin
+> `TransferBar.svelte` in the reader and file downloader.
+> Verified: new integration test hosts an 8 MiB file, downloads it over a
+> real two-node Link, asserts ≥3 monotonic progress events ending at 1.0 and
+> a complete event with the correct SHA-256 (5.4 s). Browser E2E on two
+> daemons: bar showed 0 % → 10 % → 20 % … and the saved 8 MiB file matched
+> SHA-256.
 
 **Why:** `link.request` already reports progress; today an 8 MiB download over
 a slow link is a silent spinner. NomadNet shows a progress bar; we should too.

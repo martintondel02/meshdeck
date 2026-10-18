@@ -69,6 +69,11 @@ async def run(args: argparse.Namespace) -> int:
                     result["ok"] = True
                     result["got"] = event.data
                     done_condition.set()
+        elif event.type in ("transfer_progress", "transfer_complete", "transfer_failed"):
+            jlog(event=event.type, **event.data)
+            result.setdefault("transfers", []).append(
+                {"event": event.type, **event.data}
+            )
         elif event.type == "message_state":
             jlog(event="message_state", **event.data)
             if (
@@ -111,7 +116,9 @@ async def run(args: argparse.Namespace) -> int:
             for attempt in range(40):
                 try:
                     data, name, elapsed = await service.download_shared(
-                        args.fetch_file_from, args.file_name
+                        args.fetch_file_from,
+                        args.file_name,
+                        transfer_id=args.transfer_id,
                     )
                     result["ok"] = True
                     result["fetched_file"] = {
@@ -120,6 +127,10 @@ async def run(args: argparse.Namespace) -> int:
                         "sha256": hashlib.sha256(data).hexdigest(),
                         "elapsed_ms": elapsed,
                     }
+                    if args.transfer_id:
+                        # let the EventBus deliver the final progress/complete
+                        # events before the process exits and writes done.json
+                        await asyncio.sleep(0.5)
                     done_condition.set()
                     return
                 except ValueError as exc:
@@ -227,6 +238,8 @@ def main() -> int:
                         help="download a shared file from this node destination hash")
     parser.add_argument("--file-name", default=None,
                         help="name of the shared file to download")
+    parser.add_argument("--transfer-id", default=None,
+                        help="request transfer progress events for this id")
     parser.add_argument("--expect-node", default=None,
                         help="done when a nomadnetwork.node announce with this hash arrives")
     parser.add_argument("--ready-file", required=True)

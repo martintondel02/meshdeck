@@ -749,9 +749,15 @@ Route-order pitfall (§14.20): aiohttp matches in REGISTRATION order, so
 `/browse/{hash}/{path:.+}` catch-all, or file downloads silently hit the
 page handler.
 
+**P4.1 done (2026-10-18):** transfer progress for pages and node files.
+`link.request(progress_callback=…)` runs on an RNS thread, so the service
+throttles (10 % / 250 ms) and publishes only through
+`EventBus.publish_from_thread`; optional `transfer_id` keeps the synchronous
+REST shape. Verified with an 8 MiB two-node integration test and a browser
+run of the progress bar.
+
 **Phase 4 remaining:** `/media` handler (image conversion needs Pillow;
-deferred), page caching, executable pages (deliberately not supported),
-transfer-progress UI for very large responses.
+deferred), page caching, executable pages (deliberately not supported).
 
 **P4.5 + P4.4 done (2026-10-18):** vitest suite (26 tests) plus the reader
 fix. Two real bugs were found by browser E2E that the unit/integration suites

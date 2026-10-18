@@ -4,6 +4,16 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added (Phase 4 — transfer progress)
+
+- Progress for large node transfers: page and `/file/` fetches report
+  throttled progress over the WebSocket, and the reader/file downloader shows
+  a thin progress bar with a percentage. Completion events carry bytes,
+  elapsed time and (for files) SHA-256. Opt-in via `?transfer_id=` on the
+  browse routes, so existing clients are unchanged.
+- Integration test: 8 MiB download over a real two-node RNS link with
+  monotonic progress and correct SHA-256.
+
 ### Fixed (Phase 4 — micron reader)
 
 - **Browsing pages from the UI actually works now.** The REST browse route

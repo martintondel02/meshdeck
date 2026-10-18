@@ -103,6 +103,18 @@ export interface NodeInfo {
   serve_pages: boolean;
 }
 
+export interface Transfer {
+  id: string;
+  path: string;
+  kind: "page" | "file";
+  progress: number;
+  bytes?: number;
+  elapsed_ms?: number;
+  sha256?: string;
+  error?: string;
+  done: boolean;
+}
+
 export interface BrowseResult {
   node_hash: string;
   path: string;
@@ -112,6 +124,7 @@ export interface BrowseResult {
 }
 
 export const pages = writable<PageMeta[]>([]);
+export const transfers = writable<Record<string, Transfer>>({});
 export const nodes = writable<NodeMeta[]>([]);
 export const nodeInfo = writable<NodeInfo | null>(null);
 

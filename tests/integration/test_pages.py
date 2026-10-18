@@ -279,3 +279,91 @@ def _read_published_hash(proc) -> str | None:
             if '"event": "node_published"' in line:
                 return json.loads(line)["hash"]
     return None
+
+
+def test_large_file_transfer_progress(tmp_path):
+    """A hosts 8 MiB; B downloads with a transfer id and reports throttled,
+    monotonic progress events ending at 1.0, then transfer_complete with the
+    correct SHA-256. Total wall time must stay well under the 120 s budget."""
+    import os
+
+    port_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    port_socket.bind(("127.0.0.1", 0))
+    port = port_socket.getsockname()[1]
+    port_socket.close()
+
+    dir_a = tmp_path / "node_a"
+    dir_b = tmp_path / "node_b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    (dir_a / "pages").mkdir()
+    (dir_a / "pages" / "index.mu").write_text(PAGE, encoding="utf-8")
+    (dir_a / "shared").mkdir()
+    payload = os.urandom(8 * 1024 * 1024)
+    (dir_a / "shared" / "large.bin").write_bytes(payload)
+    sha = hashlib.sha256(payload).hexdigest()
+
+    proc_a = launch_node(
+        dir_a,
+        SERVER_EXTRA.format(port=port),
+        "LargeHost",
+        serve_node="Large File Node",
+    )
+    try:
+        assert wait_for_file(dir_a / "ready.json", BOOT_TIMEOUT)
+        node_hash_a = _read_published_hash(proc_a)
+        assert node_hash_a
+
+        started = time.time()
+        proc_b = launch_node(
+            dir_b,
+            CLIENT_EXTRA.format(port=port),
+            "LargeReader",
+            fetch_file_from=node_hash_a,
+            file_name="large.bin",
+            transfer_id="t-large",
+        )
+        try:
+            assert wait_for_file(dir_b / "done.json", TEST_TIMEOUT), (
+                "B never downloaded the large file\n"
+                + "\n".join(f"[A] {ln}" for ln in _dump(proc_a.stdout))
+                + "\n"
+                + "\n".join(f"[B] {ln}" for ln in _dump(proc_b.stdout))
+            )
+            elapsed = time.time() - started
+            result = json.loads((dir_b / "done.json").read_text())
+            got = result["fetched_file"]
+            assert got["size"] == len(payload)
+            assert got["sha256"] == sha
+
+            events = result["transfers"]
+            # The reader retries until A's path is known; those attempts emit
+            # transfer_failed(no_path) before the successful one. Anything
+            # else is a real failure.
+            failures = [e for e in events if e["event"] == "transfer_failed"]
+            assert all(e["error"] == "no_path" for e in failures), failures
+            progress = [
+                e["progress"]
+                for e in events
+                if e["event"] == "transfer_progress" and e["id"] == "t-large"
+            ]
+            assert len(progress) >= 3, f"too few progress events: {progress}"
+            assert progress == sorted(progress), f"progress not monotonic: {progress}"
+            assert progress[-1] == 1.0, f"last progress was {progress[-1]}"
+            complete = [
+                e
+                for e in events
+                if e["event"] == "transfer_complete" and e["id"] == "t-large"
+            ]
+            assert len(complete) == 1
+            assert complete[0]["sha256"] == sha
+            assert complete[0]["bytes"] == len(payload)
+            assert complete[0]["path"] == "/file/large.bin"
+            assert complete[0]["elapsed_ms"] < 120_000
+            assert elapsed < 120, f"transfer took {elapsed:.1f}s"
+        finally:
+            proc_b.terminate()
+            proc_b.wait(timeout=20)
+    finally:
+        proc_a.terminate()
+        proc_a.wait(timeout=20)

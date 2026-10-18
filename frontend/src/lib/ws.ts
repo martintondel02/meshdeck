@@ -9,9 +9,11 @@ import {
   messages,
   nodes,
   peers,
+  transfers,
   upsertMessage,
   type NodeMeta,
   type Peer,
+  type Transfer,
 } from "./stores";
 
 let ws: WebSocket | null = null;
@@ -114,6 +116,37 @@ function handleEvent(event: string, data: Record<string, unknown>): void {
       break;
     case "node_announced": {
       api<NodeMeta[]>("/api/v1/nodes").then((n) => nodes.set(n));
+      break;
+    }
+    case "transfer_progress":
+    case "transfer_complete":
+    case "transfer_failed": {
+      const id = String(data.id ?? "");
+      if (!id) break;
+      const progress =
+        event === "transfer_complete"
+          ? 1
+          : typeof data.progress === "number"
+            ? data.progress
+            : 0;
+      transfers.update((all) => {
+        const prev = all[id];
+        const next: Transfer = {
+          id,
+          path: (data.path as string) ?? prev?.path ?? "",
+          kind: (data.kind as Transfer["kind"]) ?? prev?.kind ?? "page",
+          progress,
+          bytes: (data.bytes as number) ?? prev?.bytes,
+          elapsed_ms: (data.elapsed_ms as number) ?? prev?.elapsed_ms,
+          sha256: (data.sha256 as string) ?? prev?.sha256,
+          error:
+            event === "transfer_failed"
+              ? String(data.error ?? "transfer failed")
+              : prev?.error,
+          done: event !== "transfer_progress",
+        };
+        return { ...all, [id]: next };
+      });
       break;
     }
   }
