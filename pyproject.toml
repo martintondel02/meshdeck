@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "waypoint"
+version = "0.1.0.dev0"
+description = "An all-in-one Reticulum application: chat, files, pages and infrastructure with basic and advanced modes"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Waypoint contributors" }]
+requires-python = ">=3.11"
+keywords = ["reticulum", "lxmf", "rns", "mesh", "chat"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Communications",
+]
+dependencies = [
+    "rns>=1.5.7,<1.7.0",
+    "lxmf>=1.2.1,<1.4.0",
+    "aiohttp>=3.10,<4",
+    "platformdirs>=4,<6",
+    "msgpack>=1,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<10",
+    "pytest-asyncio>=0.25,<1.2",
+    "ruff>=0.6,<1",
+]
+
+[project.scripts]
+waypoint = "waypoint.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/TBD/waypoint"
+
+[tool.hatch.build.targets.wheel]
+packages = ["waypoint"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-m 'not integration'"
+markers = [
+    "integration: tests that spawn real RNS/LXMF subprocesses (run with -m integration)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501"]
