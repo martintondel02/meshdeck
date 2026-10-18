@@ -1,0 +1,617 @@
+# Waypoint — Master Build Plan
+
+This is the single source of truth for building Waypoint. It is written to be
+executed top-to-bottom by a builder (human or agent) without re-litigating
+decisions. If a section conflicts with reality (API changed, environment
+differs), update this file in the same commit that adapts the code.
+
+- **Project:** Waypoint (working title, rename freely — search/replace
+  `waypoint`/`Waypoint` when final name is chosen)
+- **Goal:** a free, open-source, all-in-one Reticulum application: chat, file
+  transfer, page hosting, and server/entrypoint hosting — with a **basic
+  mode** (guided, zero jargon) and an **advanced mode** (full control).
+- **First milestone:** end-to-end LXMF peer chat daemon with a working local
+  web UI.
+
+---
+
+## 1. Context and environment
+
+### 1.1 Ecosystem facts (researched, verified)
+
+- Reticulum (`rns` on PyPI) **1.5.7** and LXMF (`lxmf` on PyPI) **1.2.1** are
+  installed in `./.venv` and import cleanly on **Python 3.14.8**.
+- Reference app for patterns: MeshChatX (Python aiohttp+WS backend, Vite/TS
+  frontend, Electron; 0BSD/MIT, forkable; EOL 2027-01-01). Read it for
+  inspiration only: <https://github.com/Quad4-Software/MeshChatX>
+- Reticulum manual: <https://reticulum.network/manual/index.html>
+- Installed package source (ground truth for API questions):
+  - `.venv/lib/python3.14/site-packages/RNS/`
+  - `.venv/lib/python3.14/site-packages/LXMF/`
+
+### 1.2 Community note (important)
+
+The Reticulum community has publicly pushed back on fully AI-generated
+**reimplementations of the protocol stack** (see "Brandolini's Reference" in
+the manual). Our approach avoids that entirely: we **depend on the official
+`rns`/`lxmf` packages** and build an application on top — same as NomadNet,
+Sideband, and MeshChatX. Do not reimplement wire formats, crypto, or the
+transport layer.
+
+### 1.3 Host machine facts
+
+- Python 3.14.8 (`python3`), **no system `pip`** — always use `./.venv`.
+  Recreate with: `python3 -m venv .venv && .venv/bin/pip install -e .`
+- Node v24.18.0, npm 11.16.0, pnpm 12.3.4 (global), cargo 1.99, git 2.56.
+- OS: Linux (Fedora). Paths below use XDG conventions with fallbacks.
+
+---
+
+## 2. Locked decisions
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| 1 | Codebase | Fresh start (MeshChatX as reference reading) | Basic/advanced mode must shape the architecture; no legacy maintenance burden; LXMF keeps us interoperable |
+| 2 | App shell | Browser web app served by the local daemon | Works on desktop + headless servers; desktop wrappers (Tauri/Electron) deferred to Phase 5 |
+| 3 | First milestone | Peer chat over LXMF | Exercises identity, announce, discovery, transport — the foundation for everything else |
+| 4 | Backend | Python ≥3.11, `asyncio` + `aiohttp` + `websockets` (aiohttp WS is fine; pick ONE: **aiohttp web + aiohttp WS**) | Same family as ecosystem apps; single HTTP+WS server in one process |
+| 5 | Protocol libs | `rns`, `lxmf` from PyPI, pinned | Reference implementation, maintained |
+| 6 | Storage | SQLite via stdlib `sqlite3` (raw SQL, no ORM) | Zero-dep, inspectable, matches MeshChatX's hard-won choice |
+| 7 | Config ownership | Waypoint manages its **own** RNS configdir (`<data>/reticulum/`), generated from our settings store. Never touches `~/.reticulum`, `share_instance = No` | A broken system rnsd or user's own experiments must not break Waypoint, and vice versa |
+| 8 | Frontend | Vite + **Svelte 5** + TypeScript + Tailwind CSS v4 | Fast to build, small output, beginner-friendly |
+| 9 | DB migrations | Hand-rolled `PRAGMA user_version` migrations | No ORM → no migration framework needed |
+| 10 | License | MIT for our code (see LICENSE) | Free, permissive, compatible with ecosystem norms |
+| 11 | Lint/format | `ruff` (Python), `prettier` (frontend) | Fast, zero-config-ish |
+| 12 | Testing | `pytest` + `pytest-asyncio`; subprocess-based integration harness (§13) | RNS module state is process-global → isolation via subprocesses |
+| 13 | Copy/docs in app | Centralized copy registry keyed per screen + markdown guides rendered in-app | Guarantees "documented with built-in guides/tooltips" is structural, not aspirational |
+
+Dependency policy: add a dependency only when the alternative is clearly
+worse, and prefer stdlib. Approved initial set: `rns`, `lxmf`, `aiohttp`,
+`platformdirs`, `msgpack` (already an LXMF dep). Dev: `pytest`,
+`pytest-asyncio`, `ruff`.
+
+---
+
+## 3. Out of scope (recorded so nobody drifts)
+
+Deferred, with intended phase noted: voice calls (LXST, Phase 6+), maps,
+Android, plugin system, RRC relay chat, remote/headless multi-user mode,
+Electron/Tauri shells (Phase 5), propagation-node hosting (Phase 4),
+browsing others' NomadNet pages (Phase 3 stretch), I2P interface wizard
+(Phase 4), blackhole list management UI (Phase 4).
+
+Explicitly never, without a new decision record: reimplementing RNS/LXMF,
+touching `~/.reticulum` silently, telemetry of any kind.
+
+---
+
+## 4. End-state feature matrix (basic vs advanced)
+
+| Feature | Basic mode | Advanced mode |
+|---|---|---|
+| Create/import identity | guided wizard, "your address" explained | + raw key export, multiple identities |
+| Connect to network | one click (AutoInterface + suggested public entrypoints) | + full interface editor (all RNS interface types), IFAC, announce rate control |
+| Chat (LXMF DM) | ✔ full | ✔ + raw fields, stamp costs, propagation settings |
+| Contacts | auto-named from announce, rename | + identities, trust/block, display-name resolution rules |
+| File transfer | drag & drop into chat | + RNS `Resource` large-file transfer over Links |
+| Message history | ✔ searchable | + export, retention rules |
+| Host a page/site | "Create my page" wizard (visual micron editor with live preview) | + raw micron editing, files, node settings |
+| Infrastructure | hidden | transport node toggle, public entrypoint wizard (BackboneInterface + announce-rate guidance), propagation node |
+| Diagnostics | "connection doctor" (friendly status) | announce table, path table, rnpath/rnprobe equivalents, live log viewer |
+| Settings | 5 friendly toggles | full config tree + raw config text editor |
+| Guides/tooltips | on everything | same, plus technical depth |
+
+The mode is a **display filter, not a security boundary**: advanced features
+are gated by capability flags in settings; the backend always enforces
+safety limits (announce rates, file size caps) regardless of mode.
+
+---
+
+## 5. Architecture
+
+### 5.1 Process and threading model (the one rule that matters)
+
+RNS runs its **own worker threads**. All RNS/LXMF callbacks (announce
+received, message delivered, delivery state changes) fire on RNS threads —
+never on the asyncio loop.
+
+```
+RNS worker threads ──► EventBus.publish_from_thread() ──► asyncio.Queue ──► loop task ──► WS clients + DB writes
+asyncio loop (aiohttp) ──► commands ──► CoreService methods (call RNS directly; RNS is thread-safe for these)
+```
+
+Rules for the builder:
+1. **Never** call asyncio APIs directly from an RNS callback. Capture the
+   running loop once and use `loop.call_soon_threadsafe(...)`.
+2. RNS calls from the asyncio loop are fine (RNS internals are locked).
+   Avoid blocking calls (Link establishment) on the loop — run those in
+   `asyncio.to_thread` / an executor.
+3. SQLite: one connection, `check_same_thread=False`, guarded by an
+   `asyncio.Lock`; or a single dedicated "db writer" task draining a queue.
+   Prefer the queue writer — simplest mental model.
+
+### 5.2 Components (backend package `waypoint/`)
+
+| Module | Responsibility |
+|---|---|
+| `waypoint/__main__.py` | CLI entry: `python -m waypoint [--data-dir X] [--port P] [--open-browser]` |
+| `waypoint/config.py` | Data-dir resolution (`platformdirs`), settings store (SQLite), first-run detection, auth-token generation/read |
+| `waypoint/rns/config_gen.py` | Renders `<data>/reticulum/config` from settings (interfaces, transport flag, logging). Pure function: settings dict → config text. Unit-test it heavily |
+| `waypoint/rns/stack.py` | `RnsStack`: owns `RNS.Reticulum(configdir=...)`, starts/stops with app, exposes interface list/status, restarts on config change |
+| `waypoint/rns/identity.py` | Load-or-create `RNS.Identity` at `<data>/identity` (0600), never logged; display-name management |
+| `waypoint/chat/router.py` | Wraps `LXMF.LXMRouter`: `register_delivery_identity`, delivery/announce callbacks → EventBus; `send(peer_hash, content, ...)`; outbound state tracking via per-message callbacks |
+| `waypoint/chat/peers.py` | Peer discovery: announce handler with `aspect_filter = "lxmf.delivery"`, decode display names (see §11), upsert into DB, announce self on start + on interval + on demand |
+| `waypoint/storage/db.py` | SQLite open/migrate (`PRAGMA user_version`), schema in §9 |
+| `waypoint/storage/messages.py` | Message CRUD, pagination queries, state updates |
+| `waypoint/core/events.py` | EventBus: `publish_from_thread(event_type, data)` → fan-out to WS subscribers + DB writer queue |
+| `waypoint/core/service.py` | Facade the API layer calls: `get_status()`, `send_message()`, `list_peers()`, etc. Owns component lifecycle (start/stop in order) |
+| `waypoint/api/server.py` | aiohttp app: REST + `/ws`, static frontend files, auth middleware (§8) |
+| `waypoint/util/hexid.py` | Hash prettifiers (first-8 display, etc.) |
+
+Lifecycle order on start: config → db+migrate → RNS stack → identity → LXMF
+router → announce handler + self-announce → API server. Reverse on stop.
+
+### 5.3 Reticulum config strategy
+
+Waypoint's data dir layout:
+
+```
+${XDG_DATA_HOME:-~/.local/share}/waypoint/
+├── waypoint.db            # SQLite (settings incl. mode, messages, peers, pages)
+├── identity               # RNS.Identity private key file, chmod 0600
+├── token                  # local API auth token, chmod 0600
+├── reticulum/
+│   └── config             # GENERATED by waypoint/rns/config_gen.py
+├── lxmf/                  # LXMRouter storagepath
+├── files/                 # received attachments (Phase 2)
+├── pages/                 # hosted site content (Phase 3)
+└── logs/
+```
+
+Generated minimal config (basic mode default):
+
+```ini
+[reticulum]
+  enable_transport = No
+  share_instance = No
+
+[logging]
+  loglevel = 4
+
+[interfaces]
+  [[Local Network]]
+    type = AutoInterface
+    enabled = yes
+```
+
+Advanced mode adds: `[[Public Entrypoint]] type = TCPClientInterface ...`
+entries, `enable_transport = Yes` toggle, `[[Hosted Gateway]] type =
+BackboneInterface ...` (Phase 4). Always re-render the whole file from
+settings; keep a raw-editor escape hatch that stores custom text and skips
+generation (with a visible warning).
+
+### 5.4 Example event flow (send a message)
+
+1. UI: POST `/api/v1/messages {peer_hash, content}`
+2. `service.send_message` → build peer OUT destination from recalled
+   identity → `LXMF.LXMessage(dest, own_delivery_destination, content, desired_method=DIRECT)`
+   → register per-message delivery/failed callbacks → `router.handle_outbound(lxm)`
+3. DB writer inserts message row (state=`sending`)
+4. LXMF delivery callback (RNS thread) → EventBus → DB update state=`delivered` + WS event `message_state` → UI ticks the checkmark
+
+---
+
+## 6. Repository layout (exact)
+
+```
+/
+├── BUILD_PLAN.md              # this file
+├── README.md  LICENSE  .gitignore
+├── pyproject.toml             # hatchling or setuptools backend; deps per §2
+├── waypoint/                  # backend package
+│   ├── __init__.py  __main__.py  version.py
+│   ├── config.py
+│   ├── api/{__init__.py,server.py,schemas.py}
+│   ├── core/{__init__.py,events.py,service.py}
+│   ├── chat/{__init__.py,router.py,peers.py,messages.py}
+│   ├── rns/{__init__.py,config_gen.py,identity.py,stack.py}
+│   ├── storage/{__init__.py,db.py,messages.py}
+│   └── util/{__init__.py,hexid.py}
+├── tests/
+│   ├── unit/                  # pure logic: config_gen, db, schemas
+│   └── integration/
+│       ├── node.py            # standalone script: runs one standalone chat node (used by harness)
+│       └── test_two_nodes.py  # spawns 2 subprocesses, asserts delivery
+├── frontend/                  # Vite + Svelte + TS + Tailwind
+│   ├── src/{App.svelte, main.ts, routes/, components/, lib/copy/}
+│   └── package.json  vite.config.ts  ...
+├── docs/
+│   └── guides/                # markdown guides rendered in-app (EN first)
+└── Makefile                   # venv, install, dev, test, lint, build-frontend
+```
+
+`rns/` subpackage name inside `waypoint/` is fine because absolute imports
+(`import RNS`) resolve against site-packages first when `waypoint` is
+installed/used as the top package — but to eliminate any shadowing doubt,
+name it `waypoint/rnsx/` if import weirdness ever appears. Default: `rns/`
+inside the `waypoint` package is safe.
+
+---
+
+## 7. Backend module specs (key signatures)
+
+```python
+# waypoint/rns/config_gen.py
+def render_config(settings: dict) -> str: ...
+# waypoint/rns/stack.py
+class RnsStack:
+    def __init__(self, configdir: Path): ...
+    def start(self) -> None            # constructs RNS.Reticulum(configdir=...)
+    def interfaces(self) -> list[dict] # name, type, online, bitrate...
+    def stop(self) -> None
+# waypoint/rns/identity.py
+class IdentityManager:
+    def load_or_create(self) -> RNS.Identity
+    @property
+    def hash_hex(self) -> str: ...
+# waypoint/chat/router.py
+class ChatRouter:
+    def __init__(self, stack, identity, storage: Storage, bus: EventBus): ...
+    def start(self) -> None   # LXMRouter(identity=..., storagepath=..., autopeer=True)
+                              # router.register_delivery_identity(identity, display_name=...)
+                              # router.register_delivery_callback(self._on_delivery)
+    def send(self, peer_hash_hex: str, title: str, content: str) -> str  # returns msg hash hex
+    def announce(self) -> None
+# waypoint/api/server.py
+def create_app(service: CoreService, token: str, static_dir: Path) -> aiohttp.web.Application
+```
+
+---
+
+## 8. Local API spec (v1)
+
+**Binding:** `http://127.0.0.1:8570` (fallback: increment until free).
+**Auth:** random token at `<data>/token`. REST: `Authorization: Bearer <t>`.
+WS: `?token=<t>` query param. Constant-time compare; reject everything else
+with 401. The CLI prints the URL with token on start; `--open-browser` opens it.
+
+### REST
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/status` | `{version, mode, rns_running, interfaces[], transport_enabled, uptime}` |
+| GET | `/api/v1/identity` | `{hash, display_name, short}` |
+| POST | `/api/v1/identity/display_name` | set + re-announce |
+| GET | `/api/v1/peers` | list known peers (hash, name, last_seen, nickname, blocked) |
+| PATCH | `/api/v1/peers/{hash}` | rename/block |
+| GET | `/api/v1/messages?peer={hash}&before={ts}&limit=50` | paginated history |
+| POST | `/api/v1/messages` | `{peer, content, title?}` → `{hash, state}` |
+| GET/PUT | `/api/v1/settings` | settings incl. `mode: basic\|advanced` |
+| POST | `/api/v1/announce` | re-announce self now |
+
+### WebSocket `/ws`
+
+All frames JSON.
+
+Client→server: `{type:"cmd", id:<n>, cmd:"send_message", data:{...}}`
+Server→client ack: `{type:"ack", id:<n>, ok:true, data:{...}}` or
+`{type:"error", id:<n>, ok:false, error:{code, message}}`
+Server→client events: `{type:"event", event:<name>, data:{...}}` with
+`event ∈ peer_announced | peer_updated | message_received | message_state |
+network_status | interfaces_changed`.
+
+No auth beyond the token; bind is loopback-only.
+
+---
+
+## 9. SQLite schema (migration v1)
+
+```sql
+PRAGMA journal_mode = WAL;
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE peers(
+  hash TEXT PRIMARY KEY,           -- destination hash hex
+  identity_hash TEXT NOT NULL,
+  display_name TEXT,
+  nickname TEXT,
+  stamp_cost INTEGER,
+  first_seen REAL, last_seen REAL,
+  blocked INTEGER DEFAULT 0
+);
+CREATE TABLE messages(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  hash TEXT UNIQUE NOT NULL,       -- lxm hash hex
+  peer_hash TEXT NOT NULL REFERENCES peers(hash),
+  direction TEXT NOT NULL,         -- 'in' | 'out'
+  state TEXT NOT NULL,             -- sending|sent|delivered|failed|received
+  method INTEGER,                  -- LXMF method used
+  title TEXT, content TEXT,
+  fields_json TEXT,
+  created_ts REAL, delivered_ts REAL
+);
+CREATE INDEX idx_messages_peer ON messages(peer_hash, created_ts);
+```
+
+Phase 2 adds `files`, Phase 3 adds `pages`. Migrations: ordered list of
+`callable(conn)` keyed to `PRAGMA user_version` bumps.
+
+---
+
+## 10. Frontend spec
+
+### 10.1 Screens (basic mode set; advanced adds "Network" and "Hosting")
+
+1. **Onboarding** (first run): welcome → create identity (auto) → pick
+   display name → "connect" (AutoInterface default; optional public
+   entrypoint picker) → done. Every step has a "Why?" expander.
+2. **Chats** — peer list (announce-discovered), unread badges, last-seen.
+3. **Chat view** — bubbles, delivery ticks (sending/sent/delivered/failed),
+   reply box, (Phase 2: attachment button).
+4. **Files** (Phase 2) — transfers in/out with progress.
+5. **My Page** (Phase 3) — visual micron editor + preview + "publish" toggle.
+6. **Settings** — profile, mode toggle (with explanation), connection,
+   data folder, about.
+7. **Network** (advanced, Phase 4) — interfaces table + editor, announces,
+   transport toggle, entrypoint wizard.
+8. **Help** — rendered markdown guides from `docs/guides/` + glossary.
+
+### 10.2 Mode system
+
+`GET /api/v1/settings.mode` drives a Svelte store; every advanced-only
+component checks `mode === 'advanced'`. Navigation hides advanced routes in
+basic mode. Mode toggle lives in Settings with a plain-language explainer.
+
+### 10.3 Guides & tooltips system
+
+- `frontend/src/lib/copy/tooltips.ts`: keyed map `screen.element → text`.
+- `Tooltip.svelte`: `?` icon → popover with copy + optional "Learn more" link
+  to a guide anchor.
+- Guide pages: markdown in `docs/guides/*.md`, rendered via a tiny MD
+  renderer (e.g. `marked`) — single source used by both the app and GitHub.
+- Glossary terms to write (keep each ≤3 sentences): identity, destination
+  hash, announce, path & hops, transport node, propagation node, interface,
+  store-and-forward, stamp, entrypoint, micron.
+
+---
+
+## 11. RNS/LXMF API cheatsheet (verified against installed 1.5.7 / 1.2.1)
+
+Ground truth paths: `.venv/lib/python3.14/site-packages/RNS/*.py`,
+`.../LXMF/*.py`. Manual examples: `https://reticulum.network/manual/examples.html`.
+
+```python
+import RNS, LXMF
+
+# Stack (single instance per process; configdir selects instance config)
+ret = RNS.Reticulum(configdir=str(configdir))          # Reticulum.py:215
+
+# Identity
+ident = RNS.Identity()                                  # create
+ident.to_file(path); ident = RNS.Identity.from_file(path)  # Identity.py:641/655
+
+# Our LXMF delivery endpoint (router does this for you)
+router = LXMF.LXMRouter(identity=ident, storagepath=str(lxmf_dir), autopeer=True)  # LXMRouter.py:102
+router.register_delivery_identity(ident, display_name="Alice")   # :358
+router.register_delivery_callback(on_message)                    # :385  on_message(lxm)
+router.enable_propagation()                                      # :563  (Phase 4, server side)
+
+# Outgoing message
+peer_ident = RNS.Identity.recall(bytes.fromhex(peer_dest_hash))  # from announce
+peer_dest = RNS.Destination(peer_ident, RNS.Destination.OUT,
+                            RNS.Destination.SINGLE, "lxmf", "delivery")
+own_dest  = router.delivery_destinations[ident.hash]             # registered delivery dest
+lxm = LXMF.LXMessage(peer_dest, own_dest, content, title,
+                     desired_method=LXMF.LXMessage.DIRECT)       # LXMessage.py:114
+lxm.register_failed_callback(cb)        # :277 — mark failed in DB/WS
+router.handle_outbound(lxm)             # LXMRouter.py:1862
+# message states: SENT=0x04 DELIVERED=0x08 FAILED=0xFF
+# methods: OPPORTUNISTIC=0x01 DIRECT=0x02 PROPAGATED=0x03
+# file attachments: fields={LXMF.FIELD_FILE_ATTACHMENTS: [[name_bytes, data_bytes], ...]}  (0x05)
+
+# Peer discovery announces
+class PeerAnnounces:
+    aspect_filter = "lxmf.delivery"
+    receive_path_responses = False
+    def received_announce(self, destination_hash, announced_identity, app_data,
+                          announce_packet_hash=None, is_path_response=False):
+        # app_data == msgpack.packb([display_name: bytes|None,
+        #                            stamp_cost: int|None,
+        #                            supported_functionality: list])
+        ...                            # msgpack.unpackb(app_data) → upsert peer
+RNS.Transport.register_announce_handler(PeerAnnounces())           # Transport.py:2956
+```
+
+Notes:
+- `RNS.Identity.recall` only works after the peer has announced (path known).
+  That's why discovery precedes chat; UI shows "waiting for announce…".
+- Delivery confirmation to the UI comes from the inbound delivery callback on
+  the sender side being the receipt... precisely: outbound state transitions
+  surface via the per-LXMessage callbacks and `lxm.state` polling fallback —
+  poll every 2s for ≤30s as belt-and-braces, it's cheap.
+- For store-and-forward when direct delivery fails (Phase 2):
+  `desired_method=LXMF.LXMessage.PROPAGATED`; receiving while offline uses
+  `router.request_messages_from_propagation_node(identity)` (:512).
+
+---
+
+## 12. Phases
+
+### Phase 0 — Bootstrap ✅ (done this session)
+venv + `rns`/`lxmf` installed and verified; README, LICENSE, BUILD_PLAN.
+Builder: run `.venv/bin/python -c "import RNS, LXMF"` to confirm.
+
+### Phase 1 — MVP: daemon + chat over LXMF + minimal UI
+
+**Backend tasks**
+1. `pyproject.toml` (setuptools backend, deps: `rns==1.5.7 lxmf==1.2.1
+   aiohttp>=3.14 platformdirs msgpack`, extras dev: pytest pytest-asyncio
+   ruff). `pip install -e .` works.
+2. `waypoint/config.py` — dirs, token, settings defaults.
+3. `waypoint/rns/config_gen.py` + unit tests (snapshot the rendered config
+   for 3 settings variants).
+4. `waypoint/rns/{identity,stack}.py` — start/stop stack with managed
+   configdir; unit: starts without exceptions (temporary dir).
+5. `waypoint/core/events.py` — EventBus thread bridge; unit test.
+6. `waypoint/storage/*` — schema v1 + migrate; unit tests.
+7. `waypoint/chat/{router,peers}.py` — LXMF wrap + announce discovery.
+8. `waypoint/core/service.py` + `waypoint/api/server.py` — REST + WS per §8,
+   auth middleware, CLI entry.
+9. Integration harness (§13) + `test_two_nodes.py` — **the acceptance test**.
+
+**Frontend tasks**
+1. `pnpm create vite frontend --template svelte-ts` (pnpm 12 is installed),
+   add Tailwind v4 (`@tailwindcss/vite`), keep it vanilla-clean.
+2. Token handling: read `?token=` once → `sessionStorage`; WS connect;
+   reconnect backoff.
+3. Three screens minimal: Onboarding-lite (display name), Chats (peer list
+   from `/api/v1/peers` + `peer_announced` events), Chat view (send via WS
+   cmd, history via REST, live updates via events).
+4. Tooltips on every Reticulum term (identity hash, announce, peer).
+5. `pnpm run build` → backend serves `frontend/dist` statically.
+
+**Definition of done**
+- `make test` green, including two-process LXMF delivery test.
+- `python -m waypoint` serves UI on `http://127.0.0.1:8570`; two instances
+  (`--data-dir /tmp/a --port 8570`, `--data-dir /tmp/b --port 8571`) on the
+  same LAN/loopback discover each other within ~60s and exchange messages
+  with delivery ticks.
+
+### Phase 2 — Contacts, history polish, files, propagation fallback
+- Contacts: nickname editing, block, manual "add by hash"; richer peer cards.
+- History: infinite scroll, full-text search, day separators.
+- Attachments: `FIELD_FILE_ATTACHMENTS` (cap 8 MiB for DIRECT—verify by
+  experiment; big files via RNS `Resource` over Link in Phase 4), progress,
+  save-to-disk, inbox `files/` folder.
+- Offline delivery: propagation fallback setting + sync on startup.
+- DoD: integration test sends a 1 MiB file between two nodes and verifies
+  hash equality; UI shows progress both sides.
+
+### Phase 3 — Host a page/site
+- Node destination per user: app `waypoint`, aspect `node`; request handler
+  serves micron pages + files (study NomadNet's node implementation and the
+  "Serving Pages Over Nomad Network" manual section).
+- Basic: visual micron editor (toolbar inserts micron syntax; live preview
+  via our own micron renderer in JS — RFnexus' micron-parser-js is the
+  reference).
+- Advanced: raw micron editor, file attachments, node announce management.
+- DoD: instance A publishes a page; instance B (advanced, or test script)
+  fetches it via Link request and renders it.
+
+### Phase 4 — Advanced mode tooling
+- Interface editor (all common RNS interface types incl. TCP/Backbone/UDP/
+  RNode-serial; IFAC fields; announce-rate guidance baked into the form).
+- Transport toggle, public entrypoint wizard (BackboneInterface, `mode =
+  gateway`, announce_rate_* presets with explanations), propagation-node
+  hosting (`router.enable_propagation()`).
+- Diagnostics: announce table, path table, `rnpath`/`rnprobe` equivalents,
+  live log tail, connection doctor heuristics.
+- Blackhole management UI.
+- DoD: user can turn a fresh Waypoint install into a working TCP-gateway
+  entrypoint in ≤5 clicks without editing text; `rnstatus`-equivalent view
+  renders real interface data.
+
+### Phase 5 — Packaging & docs
+- PyPI package (console script `waypoint`), Docker image, systemd unit file,
+  desktop shell spike (Tauri first), GitHub Actions: lint+test matrix
+  (Linux/macOS/Windows; Python 3.11–3.14), release workflow building wheels.
+- Docs site from `docs/guides` (same markdown as in-app), CONTRIBUTING.md,
+  screenshots, first tagged release `v0.1.0`.
+
+---
+
+## 13. Testing strategy
+
+**Unit**: config_gen snapshots, DB migrations, schemas/validators,
+hexid utils, EventBus ordering. Fast, no network.
+
+**Integration (two real nodes, subprocesses)** — recipe:
+
+`tests/integration/node.py` (standalone script): parses `--configdir
+--display-name --expect-from <hash> --send-to <hash> --message <text>
+--ready-file --done-file`; boots RNS+LXMF exactly like the app does;
+prints JSON lines to stdout; touches ready/done sentinel files; exit 0 on
+success, 1 on timeout (120s).
+
+Node A config: TCP server —
+```ini
+[reticulum]
+enable_transport = No
+share_instance = No
+[logging]
+loglevel = 4
+[interfaces]
+[[Test Server]]
+type = TCPServerInterface
+enabled = yes
+listen_on = 127.0.0.1
+port = 4255
+```
+Node B config: TCP client — same but
+```ini
+[[Test Client]]
+type = TCPClientInterface
+enabled = yes
+target_host = 127.0.0.1
+target_port = 4255
+```
+`test_two_nodes.py`: temp dirs → write configs → spawn both with
+`subprocess.Popen` → wait for ready files → trigger B to send → assert A's
+done file + B's delivery receipt → teardown (terminate, collect logs on
+failure). Run under a generous timeout; mark `integration` (pytest marker
+registered in pyproject) so unit runs stay fast. Phase 1 CI runs these too.
+
+**Frontend**: `vitest` for store/util logic; screenshots/manual QA per
+phase; Playwright optional from Phase 5.
+
+---
+
+## 14. Pitfalls (learned from ecosystem code + manual; reread before phases)
+
+1. **Threads**: RNS callbacks ≠ asyncio. Only `call_soon_threadsafe`.
+2. **Process-global RNS state**: never construct two `RNS.Reticulum` in one
+   process; tests use subprocesses.
+3. **`share_instance = No`** in generated config — otherwise Waypoint
+   silently binds to a running system `rnsd` and appears "broken".
+4. **Announce storms**: respect rate limits; on hosted/gateway interfaces
+   always set `announce_rate_target/grace/penalty` presets (see manual).
+   Test only on loopback/private interfaces, never on public backbones.
+5. **Identity recall**: sending to a peer requires a known path; if not
+   known, `RNS.Transport.request_path(dest_hash)` then wait/retry — LXMF's
+   autopeer does much of this for DIRECT; show "waiting for path" in UI.
+6. **AutoInterface needs IPv6 link-local** — in Docker/CI prefer explicit
+   TCP interfaces (our harness does).
+7. **SQLite + threads**: single writer task; WAL mode.
+8. **Secrets**: identity file and API token are `0600`; never log them;
+   `.gitignore` the data dir.
+9. **Message size**: LXMF DIRECT has practical size limits; enforce caps and
+   route big payloads via fields→attachments→(later) Resources.
+10. **Port conflicts**: auto-increment default port; never bind non-loopback
+    without an explicit advanced setting.
+11. **License hygiene**: keep MIT headers on our files; vendor nothing from
+    MeshChatX without preserving its license notices.
+
+---
+
+## 15. Build order checklist (execute in order; commit per step)
+
+- [ ] 1. `pyproject.toml` + package skeleton + `python -m waypoint` stub
+- [ ] 2. `config.py` + `storage/db.py` + migrations + unit tests
+- [ ] 3. `rns/config_gen.py` + unit tests (snapshot 3 variants)
+- [ ] 4. `core/events.py` + unit test
+- [ ] 5. `rns/identity.py` + `rns/stack.py` (smoke: stack starts in temp dir)
+- [ ] 6. `chat/peers.py` (announce decode unit test with crafted msgpack)
+- [ ] 7. `chat/router.py` + `core/service.py` skeletons
+- [ ] 8. Integration harness `node.py` + `test_two_nodes.py` — make it pass
+- [ ] 9. `api/server.py` (REST + WS + auth) + tests for auth + happy paths
+- [ ] 10. Frontend scaffold (Svelte+TS+Tailwind) + token + WS store
+- [ ] 11. Onboarding-lite + Chats + Chat view wired to real API
+- [ ] 12. Backend serves `frontend/dist`; `make dev` flow documented
+- [ ] 13. Phase 1 DoD manual test: two instances, two browsers, real chat
+- [ ] 14. `Makefile`, README dev quickstart refresh, CHANGELOG start
+
+Then continue into Phase 2, keeping this file's checkboxes current.
+
+---
+
+*Plan written 2026-10-18 against rns 1.5.7 / lxmf 1.2.1 on Python 3.14.8.
+Update the "verified" cheatsheet (§11) whenever dependencies are bumped.*

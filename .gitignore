@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+
+# Waypoint runtime data (never commit)
+waypoint-data/
+**/data/
+*.db
+*.db-wal
+*.db-shm
+token
+identity
+
+# OS / editors
+.DS_Store
+*.swp
