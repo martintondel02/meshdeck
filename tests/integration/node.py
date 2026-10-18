@@ -23,6 +23,11 @@ from meshdeck.core.service import CoreService
 
 REANNOUNCE_SECONDS = 5
 RETRY_SEND_SECONDS = 3
+# When the target is offline (propagated delivery) the identity is seeded, so
+# the only thing missing is the path; retry faster than the direct-send case.
+RETRY_SEND_NO_PEER_SECONDS = 2
+SYNC_RETRY_SECONDS = 5
+SEND_CONCLUDE_TIMEOUT = 90
 
 
 def jlog(**fields) -> None:
@@ -40,6 +45,8 @@ async def run(args: argparse.Namespace) -> int:
 
     peer_found = asyncio.Event()
     sent_hash: dict[str, str] = {}
+    send_concluded = asyncio.Event()
+    send_result: dict = {}
     return_code = [0]
 
     async def on_event(event) -> None:
@@ -76,11 +83,18 @@ async def run(args: argparse.Namespace) -> int:
             )
         elif event.type == "message_state":
             jlog(event="message_state", **event.data)
+            state = event.data.get("state")
+            matches = bool(sent_hash) and event.data.get("hash") == sent_hash.get("hash")
+            if matches and state in ("sent", "delivered", "failed"):
+                send_result["state"] = state
+                if state == "failed":
+                    send_result["failed"] = True
+                send_concluded.set()
             if (
-                event.data.get("state") == "delivered"
-                and sent_hash
-                and event.data.get("hash") == sent_hash["hash"]
+                state == "delivered"
+                and matches
                 and not args.expect  # when expecting a reply, done waits for it
+                and not args.exit_after_send
             ):
                 result["ok"] = True
                 result["delivered"] = sent_hash["hash"]
@@ -88,6 +102,27 @@ async def run(args: argparse.Namespace) -> int:
 
     service.bus.subscribe(on_event)
     await service.start()
+
+    # Seed public identities for peers that are offline and have therefore never
+    # announced to this node. Without this, an LXMF send to their address fails
+    # with "no_path" before a propagation node ever gets involved.
+    if args.seed_peer:
+        import RNS
+
+        for spec in args.seed_peer.split(","):
+            peer_hash_hex, public_key_hex = spec.split(":", 1)
+            public_key = bytes.fromhex(public_key_hex)
+            if len(public_key) != RNS.Identity.KEYSIZE // 8:
+                raise SystemExit(f"invalid public key length for {peer_hash_hex}")
+            dest_hash = bytes.fromhex(peer_hash_hex)
+            if dest_hash in RNS.Identity.known_destinations:
+                # Already learned from an announce (which carries app_data such
+                # as stamp costs); do not overwrite it with a bare key.
+                continue
+            RNS.Identity.remember(
+                bytes(32), dest_hash, public_key
+            )
+            jlog(event="peer_seeded", hash=peer_hash_hex)
 
     if args.serve_node:
         # parent may have pre-written pages into <data>/pages
@@ -173,9 +208,19 @@ async def run(args: argparse.Namespace) -> int:
 
         asyncio.create_task(restart_watcher())
 
+    status = service.status()
     info = service.identity_info()
+    info["propagation_hosting"] = status["propagation_hosting"]
+    info["propagation_node_hash"] = status["propagation_node_hash"]
+    # Public key lets a peer seed this node's identity while it is offline.
+    info["public_key"] = service.identity.identity.get_public_key().hex()
     Path(args.ready_file).write_text(json.dumps(info), encoding="utf-8")
     jlog(event="ready", **info)
+
+    if args.exit_after_ready:
+        # Used by the harness to learn a node's addresses, then take it offline.
+        await service.stop()
+        return 0
 
     async def announce_loop() -> None:
         while not done_condition.is_set():
@@ -187,13 +232,34 @@ async def run(args: argparse.Namespace) -> int:
 
     asyncio.create_task(announce_loop())
 
+    if args.sync_retry and args.propagation_node:
+        async def sync_loop() -> None:
+            """C's first sync at startup can precede the path/identity to A."""
+            while not done_condition.is_set():
+                try:
+                    ok = await asyncio.to_thread(
+                        service.chat.sync_from_propagation_node
+                    )
+                    jlog(event="sync_retry", ok=ok)
+                except Exception as exc:  # noqa: BLE001
+                    jlog(event="sync_retry_failed", error=str(exc))
+                await asyncio.sleep(SYNC_RETRY_SECONDS)
+
+        asyncio.create_task(sync_loop())
+
     if args.send_to and (args.message or args.send_file):
         async def sender() -> None:
-            try:
-                await asyncio.wait_for(peer_found.wait(), timeout=args.timeout)
-            except asyncio.TimeoutError:
-                jlog(event="send_aborted", reason="peer never announced")
-                return
+            if not args.send_without_peer_wait:
+                try:
+                    await asyncio.wait_for(peer_found.wait(), timeout=args.timeout)
+                except asyncio.TimeoutError:
+                    jlog(event="send_aborted", reason="peer never announced")
+                    return
+            retry_seconds = (
+                RETRY_SEND_NO_PEER_SECONDS
+                if args.send_without_peer_wait
+                else RETRY_SEND_SECONDS
+            )
             while not done_condition.is_set():
                 try:
                     if args.send_file:
@@ -205,13 +271,43 @@ async def run(args: argparse.Namespace) -> int:
                         res = service.send_message(args.send_to, args.message)
                     sent_hash["hash"] = res["hash"]
                     jlog(event="sent", **res)
-                    return
+                    break
                 except ValueError as exc:
                     if str(exc) == "no_path":
                         jlog(event="send_retry", reason="no_path")
-                        await asyncio.sleep(RETRY_SEND_SECONDS)
+                        await asyncio.sleep(retry_seconds)
                     else:
-                        raise
+                        jlog(event="send_failed", reason=str(exc))
+                        result["ok"] = False
+                        result["error"] = str(exc)
+                        return_code[0] = 1
+                        done_condition.set()
+                        return
+            else:
+                return
+
+            if args.exit_after_send:
+                # Give the outbound thread time to hand the message to the
+                # propagation node before this process exits.
+                try:
+                    await asyncio.wait_for(
+                        send_concluded.wait(), timeout=SEND_CONCLUDE_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    jlog(event="send_concluded_timeout", hash=sent_hash["hash"])
+                    result["ok"] = False
+                    result["error"] = "send_timeout"
+                    return_code[0] = 1
+                else:
+                    if send_result.get("failed"):
+                        result["ok"] = False
+                        result["error"] = "send_failed"
+                        return_code[0] = 1
+                    else:
+                        result["ok"] = True
+                        result["sent"] = sent_hash["hash"]
+                        result["send_state"] = send_result.get("state")
+                done_condition.set()
 
         asyncio.create_task(sender())
 
@@ -260,6 +356,24 @@ def main() -> int:
                         help="request transfer progress events for this id")
     parser.add_argument("--expect-node", default=None,
                         help="done when a nomadnetwork.node announce with this hash arrives")
+    parser.add_argument("--host-propagation", action="store_true",
+                        help="seed host_propagation_node=True before start")
+    parser.add_argument("--delivery-method", default=None,
+                        help="seed delivery_method (direct/propagated/opportunistic)")
+    parser.add_argument("--propagation-node", default=None,
+                        help="seed propagation_node_hash (hex) of the store-and-forward node")
+    parser.add_argument("--seed-peer", default=None,
+                        metavar="HASH:PUBKEY_HEX[,HASH:PUBKEY_HEX]",
+                        help="seed peer public identities so they need not be online")
+    parser.add_argument("--send-without-peer-wait", action="store_true",
+                        help="start sending immediately instead of waiting for the "
+                             "target's announce (target is offline); retry no_path")
+    parser.add_argument("--exit-after-send", action="store_true",
+                        help="after the message reaches sent/delivered, stop and exit 0")
+    parser.add_argument("--exit-after-ready", action="store_true",
+                        help="write ready.json, stop the service and exit 0")
+    parser.add_argument("--sync-retry", action="store_true",
+                        help="retry sync_from_propagation_node every few seconds")
     parser.add_argument("--ready-file", required=True)
     parser.add_argument("--done-file", required=True)
     parser.add_argument("--timeout", type=int, default=120)
@@ -275,7 +389,14 @@ def main() -> int:
     async def boot() -> int:
         paths = AppPaths(data_dir=Path(args.data_dir))
         paths.ensure()
-        if args.extra_config_file or args.no_autointerface or args.display_name:
+        if (
+            args.extra_config_file
+            or args.no_autointerface
+            or args.display_name
+            or args.host_propagation
+            or args.delivery_method
+            or args.propagation_node
+        ):
             from meshdeck.config import SettingsStore
             from meshdeck.storage.db import Database
 
@@ -288,6 +409,12 @@ def main() -> int:
                 store.set("extra_config_text", Path(args.extra_config_file).read_text())
             if args.display_name:
                 store.set("display_name", args.display_name)
+            if args.host_propagation:
+                store.set("host_propagation_node", True)
+            if args.delivery_method:
+                store.set("delivery_method", args.delivery_method)
+            if args.propagation_node:
+                store.set("propagation_node_hash", args.propagation_node)
             db.close()
         return await run(args)
 

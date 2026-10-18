@@ -106,9 +106,13 @@ class ChatRouter:
         router.register_delivery_callback(self._on_inbound)
         self._router = router
         self.apply_delivery_settings()
-        if self._host_propagation_node:
-            # Safe at runtime: LXMF registers the store-and-forward handlers
-            # and announces the propagation destination immediately.
+        # Apply the persisted hosting preference after the router exists. The
+        # flag is already True here, so reset it first: the setter's equality
+        # guard would otherwise skip enable_propagation() (no message store,
+        # no handlers, no propagation announce, while status still said true).
+        host_propagation = self._host_propagation_node
+        self._host_propagation_node = False
+        if host_propagation:
             self.set_propagation_hosting(True)
         log.info("LXMF router started; address=%s", self.delivery_destination_hash_hex)
 
@@ -180,11 +184,14 @@ class ChatRouter:
         if not self._propagation_node_hash or self._router is None:
             return False
         try:
-            identity = RNS.Identity.recall(bytes.fromhex(self._propagation_node_hash))
-            if identity is None:
-                log.info("propagation node identity unknown yet; sync skipped")
-                return False
-            self._router.request_messages_from_propagation_node(identity)
+            # LXMF calls Link.identify() with this argument so the propagation
+            # node knows whose mailbox to serve: it must be OUR identity (with
+            # the private key), not the propagation node's public identity.
+            # Passing the latter fails with "identity does not hold a private
+            # key" and no messages are ever fetched.
+            self._router.request_messages_from_propagation_node(
+                self._identity_manager.identity
+            )
             log.info("requested message sync from propagation node")
             return True
         except Exception:  # noqa: BLE001

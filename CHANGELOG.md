@@ -12,6 +12,9 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
   and honest cost/privacy notes. `GET /api/v1/status` now exposes
   `propagation_hosting` and `propagation_node_hash`.
 - `docs/guides/hosting-infrastructure.md` plus a built-in Guides section.
+- End-to-end integration test: A hosts a propagation node, B sends a
+  propagated message to offline C through A, C comes online, syncs and
+  receives it (with sender/signature checks).
 
 ### Added (Phase 5 — i18n scaffolding)
 
@@ -77,6 +80,14 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
 
 ### Fixed (pre-release)
 
+- Propagation hosting enabled at startup now actually calls
+  `LXMRouter.enable_propagation()` (the idempotence guard skipped it when the
+  setting was already true, so status claimed hosting while no message store
+  or handlers existed).
+- Syncing from a propagation node now identifies the link with *our* identity
+  (the private-key one), not the propagation node's public identity — the
+  previous call failed with `KeyError: Signing failed because identity does
+  not hold a private key` and never fetched stored messages.
 - Sending to a peer whose announce had not yet been stored (a real race seen
   while setting up two fresh nodes) no longer returns `500 FOREIGN KEY
   constraint failed` after LXMF has already sent the message: the outbound

@@ -668,6 +668,18 @@ phase; Playwright optional from Phase 5.
     `_record_outbound` must `ensure_peer` *before* inserting. Otherwise LXMF
     sends the message successfully and the API then returns 500
     `FOREIGN KEY constraint failed`, leaving the UI to think it failed.
+24. **Idempotence guards can skip first-time setup.** `_host_propagation_node`
+    was preset from settings, then `start()` called `set_propagation_hosting(True)`,
+    whose `enabled == flag` early-return meant `LXMRouter.enable_propagation()`
+    never ran: no message store, no handlers, no announce — while `/status`
+    reported hosting. Reset the flag before the first apply (or compare the
+    router's actual state).
+25. **`LXMRouter.request_messages_from_propagation_node(identity)` takes OUR
+    identity.** LXMF calls `link.identify(identity)` with it so the node knows
+    whose mailbox to serve; passing the propagation node's recalled public
+    identity fails with `KeyError: Signing failed because identity does not
+    hold a private key` and stores nothing. End-to-end test:
+    `tests/integration/test_propagation.py`.
 
 ---
 
@@ -779,7 +791,10 @@ is live-applied via `LXMRouter.enable_propagation()`/`disable_propagation()`;
 status exposes the flag and the stable propagation address; advanced Settings
 has the toggle + copyable address, the guide covers costs/privacy. Verified
 live on a real daemon (enable/log/address stable/disable) plus an API test.
-End-to-end store-and-forward test is a separate commit.
+End-to-end store-and-forward test now passes (~12 s): A hosts, B sends to
+offline C via A, C syncs and receives. It caught two router bugs — the startup
+hosting guard skipped `enable_propagation()`, and sync identified the link
+with the propagation node's public identity instead of our own (§14.24/25).
 
 **P5.5 done (2026-10-18):** docs & first impressions — rewritten README with
 four real screenshots (two throwaway daemons, Playwright), CONTRIBUTING,

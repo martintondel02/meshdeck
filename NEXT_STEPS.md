@@ -235,7 +235,7 @@ receipt = link.request(path, data={}, timeout=T, max_response_size=N,
   served from cache with `stale=True`; assert the content is byte-identical.
 - Cache must never store > 4 MiB per entry (same cap as pages).
 
-### P4.3 — Propagation-node hosting (advanced toggle)  ★ high value, small  ✅ DONE (live toggle verified; E2E store-and-forward test in a follow-up commit)
+### P4.3 — Propagation-node hosting (advanced toggle)  ★ high value, small  ✅ DONE
 
 > **Landed (2026-10-18):** `host_propagation_node` setting (default off,
 > live-applied — no restart); `ChatRouter.set_propagation_hosting()` calls
@@ -247,9 +247,10 @@ receipt = link.request(path, data={}, timeout=T, max_response_size=N,
 > hosting-infrastructure.md` + a Guides-tab section explain hosting.
 > **Verified:** real daemon PUT true → `propagation_hosting: true`, router log
 > “Propagation node hosting enabled”, address unchanged, PUT false → false;
-> API acceptance test added. The end-to-end “B → A → offline C syncs” test is
-> authored/verified separately (follow-up commit) so this commit does not
-> overclaim it.
+> API acceptance test added; and the end-to-end store-and-forward integration
+> test (A hosts, B sends to offline C via A, C syncs and receives) passes in
+> ~12 s — it exposed and now guards two real router bugs (BUILD_PLAN
+> §14.24/§14.25).
 
 **Why:** "all-in-one" should include being infrastructure: a store-and-forward
 node others can use when peers are offline.
