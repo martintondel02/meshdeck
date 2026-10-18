@@ -2,7 +2,7 @@
 
 All notable changes to MeshDeck. Format based on Keep a Changelog.
 
-## [Unreleased]
+## [0.1.0] - 2026-10-18
 
 ### Added (Phase 4 — propagation hosting)
 

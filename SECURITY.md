@@ -34,13 +34,12 @@ instance and your own nodes, not against other people's infrastructure.
 
 | Version | Supported |
 |---|---|
-| `main` (current pre-release, `0.1.0.dev0`) | Yes |
+| `0.1.0` (latest tagged release) | Yes |
+| `main` (development) | Best effort |
 | Any earlier commit or pre-release | No |
-| Tagged releases | None yet |
 
-There has not been a tagged release yet. Until `v0.1.0` is tagged, the only
-supported version is the current `main` branch / latest pre-release. Fixes land
-on `main`; there are no backport branches.
+`v0.1.0` is the first tagged release. Fixes land on `main` and are released in
+the next tag; there are no backport branches for pre-1.0 releases.
 
 ## What MeshDeck does and does not protect
 

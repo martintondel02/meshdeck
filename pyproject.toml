@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meshdeck"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "An all-in-one Reticulum application: chat, files, pages and infrastructure with basic and advanced modes"
 readme = "README.md"
 license = { text = "MIT" }

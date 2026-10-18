@@ -1,18 +1,21 @@
 # MeshDeck
 
 [![CI](https://github.com/martintondel02/meshdeck/actions/workflows/ci.yml/badge.svg)](https://github.com/martintondel02/meshdeck/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/martintondel02/meshdeck?sort=semver)](https://github.com/martintondel02/meshdeck/releases)
 
 > A local-first Reticulum application: encrypted chat, file sharing, page hosting
 > and network infrastructure behind a browser UI — with a basic mode for people
 > who just want to talk, and an advanced mode for people who want the knobs.
 
-**Status: pre-release (`v0.1.0.dev0`).** Chat, contacts, attachments, page
-hosting and browsing, shared node files and the interface editor are implemented
-and covered by tests, and a PyInstaller build target exists. Phase 5 (release
-readiness) is still in progress, so there is no tagged release and no prebuilt
-binary to download, and no published AppImage or Flatpak. UI and copy may still
-change. The live task list is [NEXT_STEPS.md](NEXT_STEPS.md); the design record
-is [BUILD_PLAN.md](BUILD_PLAN.md).
+**Status: v0.1.0 — first release.** Chat, contacts, attachments, page hosting
+and browsing with an offline cache, shared node files, transfer progress,
+propagation-node hosting, the interface editor and an English-only i18n
+foundation are implemented and covered by unit + integration tests. Prebuilt
+Linux x86_64 artifacts (tarball and AppImage, with checksums) are attached to
+the [v0.1.0 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.0);
+Flatpak remains an unverified manifest. UI and copy may still change. The live
+task list is [NEXT_STEPS.md](NEXT_STEPS.md); the design record is
+[BUILD_PLAN.md](BUILD_PLAN.md).
 
 MeshDeck is free and open-source (MIT), built on the reference
 [Reticulum](https://reticulum.network/) stack. It uses the official `rns` and
@@ -85,17 +88,27 @@ To try two identities at once, start a second isolated instance:
 Each instance gets its own identity, database and Reticulum config. Use the
 address from one instance's Settings screen in the other's "add peer" field.
 
-### Or run the packaged binary
+### Or download a release binary
+
+The [v0.1.0 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.0)
+ships two Linux x86_64 artifacts, with `SHA256SUMS`:
+
+- `meshdeck-0.1.0-x86_64.tar.gz` — extract and run `./meshdeck-0.1.0-x86_64/meshdeck`
+- `meshdeck-0.1.0-x86_64.AppImage` — `chmod +x` and run it directly
+
+The web UI is embedded, so neither needs Python installed. Flatpak is **not**
+published: the manifest in `packaging/flatpak/` has never been built
+(`flatpak-builder` was unavailable), and `packaging/README.md` says so.
+
+To build it yourself instead:
 
 ```bash
 make package            # PyInstaller one-file build → dist/meshdeck
 ./dist/meshdeck
 ```
 
-The web UI is embedded in the binary, so the result needs no Python install.
-There are no prebuilt release downloads yet. AppImage and Flatpak manifests are
-experimental and are not part of a release. `make package` installs PyInstaller
-into the venv and requires the frontend dependencies.
+`make package` installs PyInstaller into the venv and requires the frontend
+dependencies.
 
 ## How it works
 
@@ -151,7 +164,8 @@ a public issue for it.
 - **Not an anonymity tool.** Reticulum encrypts and authenticates traffic; it
   does not hide that a node exists or when it announces.
 - **Not a native desktop or mobile app yet.** It is a browser UI plus a local
-  daemon. No AppImage, Flatpak, release binary or Android build is published.
+  daemon. The release artifacts are Linux x86_64 only; no Flatpak or Android
+  build is published.
 - **Not a companion to your system `rnsd`.** MeshDeck runs its own Reticulum
   instance with `share_instance = No` and never touches `~/.reticulum`.
 - **Not a full NomadNet clone.** Pages are static micron; there are no
