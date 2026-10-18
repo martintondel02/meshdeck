@@ -1,15 +1,13 @@
 # Flatpak manifest for MeshDeck.
 #
-# STATUS: UNVERIFIED. The host this manifest was written on has no
-# `flatpak-builder` (and no `flatpak` remote configured), so it has never been
-# built. The runtime/sdk pair below is the intended target and was NOT
-# verified against Flathub's repository; if `org.freedesktop.Platform//24.08`
-# is unavailable on the target machine, replace both versions with a currently
-# supported freedesktop runtime (e.g. 25.08) and re-run the recipe in
-# packaging/README.md.
+# STATUS: verified on Fedora 44 (2026-10-19) with org.flatpak.Builder 1.4.9
+# (installed user-level from Flathub) and the freedesktop 26.08 runtime/SDK.
+# `flatpak run org.meshdeck.MeshDeck --version` prints the release version and
+# the installed app serves the UI + authenticated API (with AutoInterface
+# disabled — see the note below). The manifest's build sandbox needs
+# `--share=network` for pip (added in build-options).
 #
 # It builds from the source tree (no PyPI release needed) with pip into /app.
-# flatpak-builder needs network access for pip to fetch hatchling + runtime deps.
 #
 # NOTE: the freedesktop SDK has no Node/pnpm, so the web UI cannot be built
 # inside the sandbox. The source tree passed to flatpak-builder must already
@@ -18,9 +16,15 @@
 # A clean git clone without that directory would install without a UI.
 # The type: dir source copies the whole working tree, so build from a clean
 # copy (without .venv/ or node_modules/) to keep the build context small.
+#
+# KNOWN LIMITATION (verified): the default AutoInterface does not start inside
+# the Flatpak sandbox on this host (RNS exits 255 before logging a reason).
+# MeshDeck still boots and serves its UI/API when AutoInterface is disabled or
+# a TCP interface is configured through the app. Do not claim "Flatpak network
+# discovery works" until that is diagnosed.
 app-id: org.meshdeck.MeshDeck
 runtime: org.freedesktop.Platform
-runtime-version: '24.08'
+runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
 command: meshdeck
 
@@ -29,6 +33,12 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
+
+# flatpak-builder disables network access inside the build sandbox by default;
+# pip needs it to fetch hatchling and the runtime dependencies.
+build-options:
+  build-args:
+    - --share=network
 
 modules:
   - name: meshdeck

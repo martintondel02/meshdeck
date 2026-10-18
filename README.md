@@ -88,6 +88,15 @@ To try two identities at once, start a second isolated instance:
 Each instance gets its own identity, database and Reticulum config. Use the
 address from one instance's Settings screen in the other's "add peer" field.
 
+> **Two instances on one machine:** both default to AutoInterface, and two
+> separate Reticulum instances can contend for the same multicast socket. If
+> the second instance stays at "Starting…" (or `/status` never reports
+> `rns_running: true`), disable AutoInterface in both and connect them over
+> loopback: add a **TCP server** interface on `127.0.0.1:4242` in instance A
+> (Advanced → Interfaces), add a matching **TCP client** in B, then
+> **Save & restart** both. This is the setup the two-instance walkthrough
+> assumes; the timed fresh-clone run in `NEXT_STEPS.md` found it the hard way.
+
 ### Or download a release binary
 
 The [v0.1.1 release](https://github.com/martintondel02/meshdeck/releases/tag/v0.1.1)

@@ -59,6 +59,35 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
   `meshdeck 0.1.1`. `packaging/README.md` and the top-level README document
   the install command and the unsigned/glibc caveats.
 
+### Added / verified (Phase 7.3 — closing verification gaps)
+
+- **Keyboard-only walkthrough performed** on two real daemons over a loopback
+  TCP pair with a one-off Playwright/Chromium run (no project dependency):
+  onboarding → add peer → open chat → send message → attach a file → Pages
+  create/save → Settings → Advanced → restart note. 9/9 steps passed, 0 console
+  errors; the second daemon received the text and the attachment blob, and the
+  typed page persisted. `docs/a11y-checklist.md` §6 records tab counts and the
+  one exception (the native file chooser payload cannot be typed headlessly).
+- **Screen-reader attempt with Orca 50.3** (already installed): Orca attached
+  to Chromium, activated its Chromium script 154 times, and its debug log shows
+  generated speech-dispatcher utterances for MeshDeck content (“Ada”, the
+  identity hash, “Help”, “PEERS Help”). **Not verified:** no human listener
+  heard or validated the announcements; the checklist leaves that item unticked.
+- **Flatpak verified** with org.flatpak.Builder 1.4.9 (user-level from
+  Flathub) and freedesktop 26.08: build + install, `--version` →
+  `meshdeck 0.1.1`, and the installed app served `GET /` + authenticated
+  `GET /api/v1/status` (200, `rns_running: true`). Manifest fixes: enable
+  network in the build sandbox (pip), move the EOL 24.08 runtime to 26.08.
+  **Caveat:** AutoInterface does not start inside the Flatpak sandbox on this
+  host (RNS exits 255), so network discovery under Flatpak is unverified.
+- **Timed fresh-clone onboarding:** clone → `make install` →
+  `make install-frontend` → `make dev` → second isolated instance → mutual add →
+  text + file received in **9.3 s** end-to-end (warm caches; not a human
+  stranger). The first attempt exposed a README bug: two local instances both
+  default to AutoInterface, contend for the multicast socket, and the second
+  never reaches `rns_running`. README now documents the loopback TCP-pair
+  workaround.
+
 ## [0.1.1] - 2026-10-19
 
 ### Added (Phase 6 — post-release hardening)

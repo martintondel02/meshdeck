@@ -14,7 +14,7 @@ PyInstaller 6.22.3 / Python 3.14.8:
 | Tarball | `packaging/release.sh` | **verified**: built, checksummed, extracted, binary ran, UI + API served |
 | AppImage | `packaging/appimage.sh` | **verified**: built with appimagetool continuous build 313 (auto-downloaded), `--version`, UI + API served |
 | RPM | `packaging/rpm.sh` | **verified**: built (Fedora 44, rpmbuild obtained user-level), `rpm -qip`/`-qlp`, extracted with `rpm2cpio`, binary prints the release version |
-| Flatpak | `packaging/flatpak/org.meshdeck.MeshDeck.yml` | **UNVERIFIED**: `flatpak-builder` is not installed on this host; manifest never built |
+| Flatpak | `packaging/flatpak/org.meshdeck.MeshDeck.yml` | **verified** (26.08, Builder 1.4.9 user-level): build + install, `--version`, UI + authenticated API served; **caveat:** AutoInterface does not start inside the sandbox |
 | Source | `make install && make dev` | documented in the top-level README, not re-verified by this packaging work |
 
 The tarball, AppImage and RPM are built against the host's glibc. They are not
@@ -171,41 +171,54 @@ Verified here: `rpm -qip` reports `Version: 0.1.1`, `License: MIT`,
 the extracted binary prints `meshdeck 0.1.1`. The artifact is
 `meshdeck-0.1.1-1.x86_64.rpm` (~23 MB).
 
-## Flatpak (UNVERIFIED)
+## Flatpak (verified, with a networking caveat)
 
-`flatpak-builder` is **not installed** on this host, so the manifest has never
-been built. The runtime/sdk pair is the intended target but was not checked
-against Flathub:
+Verified on Fedora 44 (2026-10-19) with **org.flatpak.Builder 1.4.9** installed
+user-level from Flathub (`flatpak install --user -y flathub
+org.flatpak.Builder`) and the freedesktop **26.08** runtime/SDK. This host has
+no root `flatpak-builder`; the extracted host binary from the `flatpak-builder`
+RPM was also used to bypass a Builder-sandbox SDK lookup issue, but the manifest
+itself is standard.
 
-- runtime: `org.freedesktop.Platform//24.08`
-- sdk: `org.freedesktop.Sdk//24.08`
+- runtime: `org.freedesktop.Platform//26.08`
+- sdk: `org.freedesktop.Sdk//26.08`
 
-If that version is retired on the target remote, update both values in the
-manifest (for example to `25.08`) before building. The manifest builds from the
-source tree with `pip install --prefix=/app`; flatpak-builder needs network
-access during the build for pip to fetch hatchling and the runtime dependencies.
-The freedesktop SDK has no Node/pnpm, so the tree must already contain a built
-`frontend/dist` (`make build-frontend`) — the manifest copies it into the
-installed package for the UI to be served. The `type: dir` source copies the
-entire working tree (including `.venv/` and `node_modules/` if present), so
-verify from a clean checkout or a copy without those directories.
+24.08 also built successfully but is end-of-life on Flathub, so the manifest was
+moved to 26.08 (the EOL warning disappeared).
 
-Verification recipe (on a host with Flatpak + flatpak-builder):
+The manifest builds from the source tree with `pip install --prefix=/app`; the
+build sandbox needs network for pip, which the manifest now enables with
+`build-options.build-args: [--share=network]`. The freedesktop SDK has no
+Node/pnpm, so the tree must already contain a built `frontend/dist`
+(`make build-frontend`) — the manifest copies it into the installed package.
+The `type: dir` source copies the whole tree, so build from a clean copy
+without `.venv/` or `node_modules/`.
+
+Recipe used:
 
 ```bash
 make build-frontend
-flatpak remote-add --if-not-exists flathub \
+flatpak remote-add --if-not-exists --user flathub \
     https://flathub.org/repo/flathub.flatpakrepo
-flatpak install --user flathub \
-    org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
-flatpak-builder --user --install --force-clean build/flatpak \
-    packaging/flatpak/org.meshdeck.MeshDeck.yml
-flatpak run org.meshdeck.MeshDeck --version
-flatpak run org.meshdeck.MeshDeck --open-browser
+flatpak install --user -y flathub \
+    org.flatpak.Builder org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08
+# clean copy of the tree + built frontend/dist, then:
+flatpak run --filesystem=/tmp --command=flatpak-builder org.flatpak.Builder \
+    --user --install --force-clean --state-dir=/tmp/flatpak-state \
+    /tmp/flatpak-build /tmp/flatpak-src/packaging/flatpak/org.meshdeck.MeshDeck.yml
+flatpak run org.meshdeck.MeshDeck --version       # -> meshdeck 0.1.1
 ```
 
-Do not list Flatpak as a supported install method until this recipe passes and
-the manifest's runtime/sdk pair has been confirmed.
+Verified: build + install succeeded; `--version` printed `meshdeck 0.1.1`; with
+`connect_autointerface=false` seeded into the app's data dir, `flatpak run
+org.meshdeck.MeshDeck --port 18998` served `GET /` → **200** and authenticated
+`GET /api/v1/status` → **200** (`rns_running: true`).
+
+**Caveat (verified, unresolved):** the default AutoInterface does **not** start
+inside the Flatpak sandbox on this host — RNS exits **255** before logging a
+reason, and the daemon never reaches its API. The app works when AutoInterface
+is disabled or a TCP interface is configured, but "Flatpak network discovery"
+is **not** verified. Do not claim it.
 
 ## Icon and desktop entry
 

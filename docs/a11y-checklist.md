@@ -66,8 +66,39 @@ no item here was exercised by a human or assistive technology.
 
 ## 6. Keyboard-only walkthrough (onboarding → add peer → chat → attach → pages → save → settings → restart note)
 
-- [ ] **Not run in a browser.** This environment has no Chromium/Playwright and no JS DOM harness, and the daemon's Python deps (RNS/LXMF) are not installed, so the app could not be served and driven end-to-end. Behaviour above is implemented and type/compile-checked, not exercised.
-- [ ] **Screen-reader pass not performed** — no screen reader (Orca/NVDA/VoiceOver) available here. Role/label choices follow the WAI-ARIA Authoring Practices by inspection only; announcements (especially the always-mounted `role="status"` regions) are untested with assistive tech.
+**Phase 7.3 rerun (2026-10-19): exercised.** Two real daemons were started on a
+loopback TCP pair, and a one-off Playwright 1.56 + cached Chromium 1248 run
+(`/tmp/pw/kb.mjs`, not a project dependency) drove the flow **keyboard-only**
+(Tab/Shift+Tab, Enter/Space, arrow keys for the roving-tabindex tablist). No
+mouse clicks were used. Results (`/tmp/kb-results.json`): **all 9 steps passed,
+0 console errors**, 0.9 s of UI actions; a cross-daemon check confirmed B
+received the text and the separate attachment message (`attachment_files=1`),
+and A persisted the typed page + `transport_enabled=true`.
+
+- [x] Onboarding: name field auto-focused, typed, Enter submitted.
+- [x] Add peer: Tab to `＋` (4 tabs), Enter opened the dialog with the field focused, typed hash, Enter submitted, peer row appeared.
+- [x] Open chat: Escape closed the dialog (focus returned to `＋`), Tab to the peer row (1 tab), Enter opened it.
+- [x] Send message: Tab to the composer (5 tabs), typed text, Enter sent; B received it over the real link.
+- [x] Attach a file: Tab to `📎` (11 tabs), Enter opened the file chooser; Playwright supplied the payload **because a native OS dialog cannot be typed into headlessly** (recorded exception, not a mouse interaction); the chip appeared and B stored the blob.
+- [x] Pages: Tab to the selected `Chats` tab (4 tabs), **ArrowRight** selected/focused `Pages` (ARIA tab pattern; non-selected tabs are `tabindex=-1` and are not Tab stops), Tab to name (2), typed `index.mu`, Tab to `＋` Create (1), Enter; Tab to editor (4), typed content, Tab to Save (22), Enter; `saved ✓`.
+- [x] Settings: Tab to selected `Pages` tab (16), **End** jumped to `Settings`; Tab to `Switch to Advanced mode` (5), Enter; Storage card showed every usage line (page cache, attachments, shared files, hosted pages, message history, logs).
+- [x] Restart note: Tab to the transport checkbox (17), Space toggled it, `Restart required for connection changes.` appeared.
+- [x] No console/page errors during the run.
+
+Earlier Phase 5.4 note (kept for history): at that time this environment had no
+Chromium/Playwright and no JS DOM harness, so the walkthrough was not run then.
+
+## 7. Screen reader — Orca attempt (Phase 7.3, 2026-10-19)
+
+Orca **is installed** (`Orca version 50.3`, AT-SPI2 2.60.7) and runs in this
+GNOME/Wayland session. A headed Chromium (Playwright, `--force-renderer-accessibility`)
+was navigated through MeshDeck with Orca active and `--debug-file` logging.
+
+- [x] Orca started (`orca --replace --debug-file /tmp/orca-run.out`), exit 0.
+- [x] `orca --list-apps` showed the desktop's accessible applications; Orca attached to Chromium and activated its Chromium script **154 times**.
+- [x] Orca's debug log records MeshDeck's accessible content and generated speech-dispatcher utterances, e.g. `SAY ALL PRESENTER: Speaking … 'Ada'`, the identity hash, `'Help'`, and `SPEECH DISPATCHER: Speaking '<speak>…Ada</speak>'` (8 `SAY ALL PRESENTER: Speaking` lines).
+- [ ] **Announcement heard/validated by a listener: NOT VERIFIED.** The agent has no audio perception; no human listener was present. The log proves Orca produced utterances for MeshDeck's accessible tree, not that they were intelligible or correct in context.
+- [ ] Focus-order/announcement quality review with a screen-reader user: **NOT VERIFIED**.
 
 ## Follow-ups found but left out of scope
 
