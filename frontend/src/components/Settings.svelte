@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { api } from "../lib/api";
   import { identity, mode, settings, status } from "../lib/stores";
   import { wsCmd } from "../lib/ws";
@@ -274,6 +275,49 @@
   let hostNote = $state("");
   let propAddrCopied = $state(false);
 
+  // Phase 7.5: read-only propagation operator dashboard.
+  interface PropagationStats {
+    hosting: boolean;
+    propagation_node_hash: string;
+    store_bytes: number | null;
+    store_limit_bytes: number;
+    stored_messages: number | null;
+    messages_received: number;
+    messages_served: number;
+    unpeered_incoming: number;
+    uptime_seconds: number | null;
+    transfer_state: string;
+    transfer_state_code: number;
+    peers: number;
+  }
+  let propStats = $state<PropagationStats | null>(null);
+  let propDashboardBusy = $state(false);
+  let propDashboardNote = $state("");
+
+  function duration(seconds: number | null): string {
+    if (seconds == null) return t("settings.prop_unknown");
+    const total = Math.floor(seconds);
+    if (total < 60) return `${total}s`;
+    if (total < 3600) return `${Math.floor(total / 60)}m ${total % 60}s`;
+    return `${Math.floor(total / 3600)}h ${Math.floor((total % 3600) / 60)}m`;
+  }
+
+  async function loadPropagation(showNote = false) {
+    propDashboardBusy = true;
+    try {
+      propStats = await api<PropagationStats>("/api/v1/propagation");
+      if (showNote) propDashboardNote = t("settings.prop_dashboard_refreshed");
+    } catch {
+      if (showNote) propDashboardNote = t("settings.prop_dashboard_failed");
+    } finally {
+      propDashboardBusy = false;
+    }
+  }
+
+  onMount(() => {
+    void loadPropagation();
+  });
+
   // seed local form state when settings load
   $effect(() => {
     if ($settings && typeof $settings.propagation_node_hash === "string" && propNode === "") {
@@ -312,6 +356,7 @@
       hostNote = value
         ? t("settings.hosting_enabled")
         : t("settings.hosting_disabled");
+      await loadPropagation();
     } catch {
       hostNote = t("settings.hosting_error");
     } finally {
@@ -596,20 +641,76 @@
       {/if}
 
       <div class="mt-4 border-t border-wp-border pt-4" data-testid="propagation-storage">
-        <p class="text-sm" role="status" aria-live="polite">
-          {#if !Boolean($settings.host_propagation_node) || live?.propagation_store_bytes == null}
-            {t("settings.propagation_store_not_hosting")}
-          {:else if live?.propagation_storage_limit_bytes}
-            {t("settings.propagation_store_usage", {
-              used: decimalSize(live.propagation_store_bytes),
-              limit: decimalSize(live.propagation_storage_limit_bytes),
-            })}
-          {:else}
-            {t("settings.propagation_store_usage_unlimited", {
-              used: decimalSize(live.propagation_store_bytes),
-            })}
-          {/if}
-        </p>
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-sm font-semibold text-wp-dim uppercase tracking-wide">
+            {t("settings.prop_dashboard_title")}
+          </h3>
+          <button
+            onclick={() => loadPropagation(true)}
+            disabled={propDashboardBusy}
+            class="bg-wp-panel2 border border-wp-border rounded-lg px-3 py-1.5 text-xs
+                   hover:border-wp-accent transition disabled:opacity-40"
+            >{t("settings.prop_dashboard_refresh")}</button
+          >
+        </div>
+        <div class="mt-2 text-sm" role="status" aria-live="polite">
+          <dl class="grid sm:grid-cols-2 gap-x-4 gap-y-1">
+            <div>
+              <dt class="text-wp-dim">{t("settings.prop_hosting_label")}</dt>
+              <dd>
+                {propStats?.hosting
+                  ? t("settings.prop_hosting_state", { state: t("settings.prop_state_on") })
+                  : t("settings.prop_hosting_state", { state: t("settings.prop_state_off") })}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-wp-dim">{t("settings.prop_store_label")}</dt>
+              <dd>
+                {#if propStats?.hosting && propStats.store_bytes != null}
+                  {propStats.store_limit_bytes
+                    ? t("settings.propagation_store_usage", {
+                        used: decimalSize(propStats.store_bytes),
+                        limit: decimalSize(propStats.store_limit_bytes),
+                      })
+                    : t("settings.propagation_store_usage_unlimited", {
+                        used: decimalSize(propStats.store_bytes),
+                      })}
+                {:else}
+                  {t("settings.propagation_store_not_hosting")}
+                {/if}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-wp-dim">{t("settings.prop_stored_label")}</dt>
+              <dd>{propStats?.stored_messages ?? t("settings.prop_unknown")}</dd>
+            </div>
+            <div>
+              <dt class="text-wp-dim">{t("settings.prop_served_label")}</dt>
+              <dd>{propStats?.messages_served ?? 0} / {propStats?.messages_received ?? 0}</dd>
+            </div>
+            <div>
+              <dt class="text-wp-dim">{t("settings.prop_unpeered_label")}</dt>
+              <dd>{propStats?.unpeered_incoming ?? 0}</dd>
+            </div>
+            <div>
+              <dt class="text-wp-dim">{t("settings.prop_peers_label")}</dt>
+              <dd>{propStats?.peers ?? 0}</dd>
+            </div>
+            <div>
+              <dt class="text-wp-dim">{t("settings.prop_uptime_label")}</dt>
+              <dd>{duration(propStats?.uptime_seconds ?? null)}</dd>
+            </div>
+            <div>
+              <dt class="text-wp-dim">{t("settings.prop_transfer_label")}</dt>
+              <dd>{propStats?.transfer_state ?? t("settings.prop_unknown")}</dd>
+            </div>
+          </dl>
+        </div>
+        {#if propDashboardNote}
+          <p class="text-xs text-wp-accent mt-1" role="status" aria-live="polite">
+            {propDashboardNote}
+          </p>
+        {/if}
         <label class="block mt-3">
           <span class="text-sm text-wp-dim">{t("settings.propagation_limit_label")}</span>
           <div class="flex gap-2 mt-1">

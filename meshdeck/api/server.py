@@ -107,6 +107,7 @@ class ApiServer:
             client_max_size=MAX_SHARED_BYTES + 1024 * 1024,
         )
         app.router.add_get("/api/v1/status", self._status)
+        app.router.add_get("/api/v1/propagation", self._propagation)
         app.router.add_get("/api/v1/identity", self._identity)
         app.router.add_post("/api/v1/identity/display_name", self._set_display_name)
         app.router.add_get("/api/v1/peers", self._peers)
@@ -178,6 +179,10 @@ class ApiServer:
 
     async def _status(self, request: web.Request) -> web.Response:
         return _json(self.service.status())
+
+    async def _propagation(self, request: web.Request) -> web.Response:
+        """Read-only propagation-operator dashboard (200 even when not hosting)."""
+        return _json(self.service.propagation_status())
 
     async def _identity(self, request: web.Request) -> web.Response:
         return _json(self.service.identity_info())

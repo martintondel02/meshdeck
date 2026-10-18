@@ -88,6 +88,26 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
   never reaches `rns_running`. README now documents the loopback TCP-pair
   workaround.
 
+### Added (Phase 7.5 — propagation-operator dashboard)
+
+- `GET /api/v1/propagation` (bearer auth like every route) returns a read-only
+  snapshot of LXMF's public propagation state: `hosting`,
+  `propagation_node_hash`, `store_bytes`/`store_limit_bytes`,
+  `stored_messages`, `messages_served`/`messages_received`,
+  `unpeered_incoming`, `peers`, `uptime_seconds`, and
+  `transfer_state`/`transfer_state_code`. When not hosting the store/uptime
+  fields are `null` and counters are zero (stable 200 shape, no error).
+- Settings → Advanced → **Host for others** gains an *Operator dashboard*
+  (hosting state, store used/limit, stored messages, served/received,
+  unpeered incoming, peers, uptime, transfer state, propagation address + copy)
+  with a **Refresh** button.
+- Stats reads are defensive: a torn `propagation_entries` read or
+  `message_storage_size()` RuntimeError yields `null`, never a 500. MeshDeck
+  still never calls `clean_message_store()` or mutates LXMF internals.
+- Tests: 18 unit tests for the stats/state mapping/torn reads, API assertions
+  for hosting-on/off shapes, auth coverage, and a real-daemon Playwright DOM
+  smoke (dashboard + Refresh, 0 console errors).
+
 ## [0.1.1] - 2026-10-19
 
 ### Added (Phase 6 — post-release hardening)

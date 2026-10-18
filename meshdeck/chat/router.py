@@ -257,6 +257,94 @@ class ChatRouter:
             return None
         return None if size is None else int(size)
 
+    # -- propagation operator stats (Phase 7.5) -------------------------------
+
+    _PR_STATE_NAMES = {
+        0x00: "idle",
+        0x01: "path_requested",
+        0x02: "link_establishing",
+        0x03: "link_established",
+        0x04: "request_sent",
+        0x05: "receiving",
+        0x06: "response_received",
+        0x07: "complete",
+        0xF0: "no_path",
+        0xF1: "link_failed",
+        0xF2: "transfer_failed",
+        0xF3: "no_identity",
+        0xF4: "no_access",
+    }
+
+    def propagation_stats(self) -> dict[str, Any]:
+        """Read-only snapshot of the public LXMRouter propagation state.
+
+        Only documented/public attributes are read; MeshDeck never calls
+        ``clean_message_store()`` or mutates LXMF internals here. Every read is
+        defensive because LXMF's own job thread can mutate the entry dict
+        between statements (a torn read yields null/"unknown", not a 500)."""
+        router = self._router
+        hosting = bool(self._host_propagation_node)
+        stats: dict[str, Any] = {
+            "hosting": hosting,
+            "propagation_node_hash": (
+                router.propagation_destination.hash.hex() if router is not None else ""
+            ),
+            "store_bytes": self.propagation_store_bytes,
+            "store_limit_bytes": self.propagation_storage_limit_bytes,
+            "stored_messages": None,
+            "messages_received": 0,
+            "messages_served": 0,
+            "unpeered_incoming": 0,
+            "uptime_seconds": None,
+            "transfer_state": "idle",
+            "transfer_state_code": 0,
+            "peers": 0,
+        }
+        if router is None:
+            return stats
+
+        try:
+            stats["messages_received"] = int(
+                getattr(router, "client_propagation_messages_received", 0) or 0
+            )
+            stats["messages_served"] = int(
+                getattr(router, "client_propagation_messages_served", 0) or 0
+            )
+            stats["unpeered_incoming"] = int(
+                getattr(router, "unpeered_propagation_incoming", 0) or 0
+            )
+            stats["peers"] = len(getattr(router, "peers", {}) or {})
+        except Exception:  # noqa: BLE001 - stats must never break the endpoint
+            log.debug("could not read LXMF propagation counters", exc_info=True)
+
+        try:
+            code = int(getattr(router, "propagation_transfer_state", 0) or 0)
+            stats["transfer_state_code"] = code
+            stats["transfer_state"] = self._PR_STATE_NAMES.get(code, "unknown")
+        except Exception:  # noqa: BLE001
+            log.debug("could not read LXMF transfer state", exc_info=True)
+
+        if not hosting:
+            return stats
+        try:
+            entries = getattr(router, "propagation_entries", None)
+            stats["stored_messages"] = len(entries) if entries is not None else None
+        except RuntimeError:
+            # LXMF's job thread changed the dict while we sized it; the next
+            # poll will succeed (same handling as message_storage_size()).
+            stats["stored_messages"] = None
+        except Exception:  # noqa: BLE001
+            log.debug("could not count LXMF propagation entries", exc_info=True)
+            stats["stored_messages"] = None
+
+        started = getattr(router, "propagation_node_start_time", None)
+        if started:
+            try:
+                stats["uptime_seconds"] = round(max(0.0, time.time() - float(started)), 1)
+            except (TypeError, ValueError):
+                stats["uptime_seconds"] = None
+        return stats
+
     # -- attachment blobs (disk usage) ----------------------------------------
 
     def set_attachment_limits(self, max_mb: int, retention_days: int) -> dict[str, int]:

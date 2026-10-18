@@ -620,6 +620,7 @@ async def test_new_routes_require_bearer_token(pair: Pair) -> None:
         ("DELETE", "/api/v1/shared/payload.bin"),
         ("GET", f"/api/v1/attachments/{peer}/{msg}/0"),
         ("GET", "/api/v1/nodes"),
+        ("GET", "/api/v1/propagation"),
         ("GET", "/api/v1/node"),
         ("PUT", "/api/v1/settings"),
     ]

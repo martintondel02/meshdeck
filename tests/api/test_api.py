@@ -83,6 +83,19 @@ async def test_api_endtoend(tmp_path):
                 st = await r.json()
                 assert st["propagation_hosting"] is True
                 assert len(st["propagation_node_hash"]) == 32
+            async with s.get(f"{base}/api/v1/propagation", headers=auth) as r:
+                assert r.status == 200
+                prop = await r.json()
+            assert prop["hosting"] is True
+            assert prop["propagation_node_hash"] == st["propagation_node_hash"]
+            assert prop["store_bytes"] == 0
+            assert prop["stored_messages"] == 0
+            assert prop["store_limit_bytes"] == 256_000_000
+            assert prop["messages_received"] == 0
+            assert prop["messages_served"] == 0
+            assert prop["unpeered_incoming"] == 0
+            assert prop["transfer_state"] == "idle"
+            assert prop["uptime_seconds"] is not None
             async with s.put(
                 f"{base}/api/v1/settings",
                 headers=auth,
@@ -91,6 +104,13 @@ async def test_api_endtoend(tmp_path):
                 assert r.status == 200
             async with s.get(f"{base}/api/v1/status", headers=auth) as r:
                 assert (await r.json())["propagation_hosting"] is False
+            async with s.get(f"{base}/api/v1/propagation", headers=auth) as r:
+                assert r.status == 200
+                prop = await r.json()
+            assert prop["hosting"] is False
+            assert prop["store_bytes"] is None
+            assert prop["stored_messages"] is None
+            assert prop["uptime_seconds"] is None
 
             # --- manual peer add (no network: unknown identity -> path requested)
             async with s.post(

@@ -457,6 +457,30 @@ class CoreService:
             **self.storage_usage(),
         }
 
+    def propagation_status(self) -> dict[str, Any]:
+        """Phase 7.5: read-only propagation-node dashboard data.
+
+        Always returns a JSON object. When not hosting, ``store_bytes``,
+        ``stored_messages`` and ``uptime_seconds`` are ``null`` and the counters
+        are zero — never an error, so the UI can show a stable "not hosting"
+        card. No LXMF store mutation happens here."""
+        if self.chat is None:
+            return {
+                "hosting": False,
+                "propagation_node_hash": "",
+                "store_bytes": None,
+                "store_limit_bytes": 0,
+                "stored_messages": None,
+                "messages_received": 0,
+                "messages_served": 0,
+                "unpeered_incoming": 0,
+                "uptime_seconds": None,
+                "transfer_state": "idle",
+                "transfer_state_code": 0,
+                "peers": 0,
+            }
+        return self.chat.propagation_stats()
+
     def identity_info(self) -> dict[str, Any]:
         return {
             "hash": self.chat.delivery_destination_hash_hex,
