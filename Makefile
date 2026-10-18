@@ -2,7 +2,7 @@ VENV := .venv
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 
-.PHONY: install install-frontend test test-integration lint check build-frontend run dev package clean
+.PHONY: install install-frontend test test-frontend test-integration lint check build-frontend run dev package clean
 
 install: ## create venv + install backend with dev deps
 	python3 -m venv $(VENV)
@@ -18,6 +18,9 @@ build-frontend: ## build the web UI into frontend/dist
 test: ## unit tests (fast)
 	$(PY) -m pytest tests/unit -q
 
+test-frontend: ## frontend unit tests (vitest)
+	cd frontend && pnpm run test
+
 test-integration: ## full integration tests (spawns real RNS nodes; takes minutes)
 	$(PY) -m pytest tests/integration -m integration -q
 
@@ -25,7 +28,7 @@ lint: ## ruff + svelte-check
 	$(VENV)/bin/ruff check meshdeck tests
 	cd frontend && pnpm run check
 
-check: test lint ## everything CI runs
+check: test test-frontend lint ## everything CI runs
 
 run: ## start the daemon + web UI (dev)
 	$(PY) -m meshdeck --verbose

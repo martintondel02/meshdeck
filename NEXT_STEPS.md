@@ -264,7 +264,17 @@ and there is no router — clicking a link to `/page/other.mu` does nothing.
 - No `href="#/browse/..."` left in the DOM after the fix (links become
   buttons or anchors with click handlers).
 
-### P4.5 — TS unit tests for micron (new tooling)  ★ small, enables P4.4
+### P4.5 — TS unit tests for micron (new tooling)  ★ small, enables P4.4  ✅ DONE
+
+> **Landed (2026-10-18):** `vitest` 5 installed, `pnpm run test` script,
+> node-environment test config in `vite.config.ts`, and
+> `src/lib/micron.test.ts` (10 tests: headings, paragraphs, bullets, rule,
+> code fences incl. unterminated, empty input, and four XSS/escaping cases).
+> `make check` now runs `test-frontend`; CI runs `pnpm run test`.
+> Verified the XSS suite catches a regression by temporarily breaking
+> `escapeHtml` (4 tests failed), then restoring it (10 passed).
+> Link/backtick/literal tests landed with the P4.4 fix, because they encode
+> behaviour that was itself broken (see the note there).
 
 Backend has 39 unit tests; the renderer has none and it is security-relevant
 (it produces `{@html}`).

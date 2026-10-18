@@ -47,6 +47,7 @@ function renderInline(raw: string): string {
 }
 
 export function renderMicron(source: string): string {
+  if (source === "") return "";
   const out: string[] = [];
   let inCode = false;
   const code: string[] = [];

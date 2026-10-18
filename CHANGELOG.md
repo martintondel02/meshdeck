@@ -10,6 +10,8 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
   Python 3.12/3.13/3.14, frontend type-check/test/build with dependency
   caching, and a non-blocking integration job running the real two-node RNS
   tests. CI badge in the README.
+- Frontend unit tests with vitest (`pnpm run test`) covering the micron
+  renderer, including XSS/escaping checks; wired into `make check` and CI.
 
 ### Added (Phase 4 — node file sharing)
 

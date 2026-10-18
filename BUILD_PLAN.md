@@ -744,6 +744,9 @@ caches), and a `continue-on-error` `integration` job (20 min timeout) that
 spawns real RNS nodes. CI badge added to the README. The frontend `test`
 step becomes effective with the vitest suite in P4.5.
 
+**P4.5 done:** frontend unit tests exist — vitest (`pnpm run test`,
+10 tests) with node-environment config; `make check` and CI both run them.
+
 ---
 
 ## 16. RNS/LXMF integration recipe (appendix: the critical path)
