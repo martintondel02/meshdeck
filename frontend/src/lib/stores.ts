@@ -13,6 +13,13 @@ export interface Peer {
   blocked: number;
 }
 
+export interface AttachmentMeta {
+  index: number;
+  name: string;
+  size: number;
+  sha256: string;
+}
+
 export interface ChatMessage {
   id: number;
   hash: string;
@@ -21,8 +28,29 @@ export interface ChatMessage {
   state: "sending" | "sent" | "delivered" | "failed" | "received";
   title: string | null;
   content: string | null;
+  fields_json: string | null;
   created_ts: number | null;
   delivered_ts: number | null;
+}
+
+export function attachmentsOf(msg: ChatMessage): AttachmentMeta[] {
+  if (!msg.fields_json) return [];
+  try {
+    const parsed = JSON.parse(msg.fields_json);
+    return Array.isArray(parsed?.attachments) ? parsed.attachments : [];
+  } catch {
+    return [];
+  }
+}
+
+export function attachmentUrl(peerHash: string, msg: ChatMessage, index: number): string {
+  return `/api/v1/attachments/${peerHash}/${msg.hash}/${index}`;
+}
+
+export function humanSize(bytes: number): string {
+  if (bytes < 1000) return `${bytes} B`;
+  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} KB`;
+  return `${(bytes / 1_000_000).toFixed(2)} MB`;
 }
 
 export interface IdentityInfo {

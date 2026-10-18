@@ -36,6 +36,52 @@
       setTimeout(() => (announceBusy = false), 800);
     }
   }
+
+  let deliveryBusy = $state(false);
+  let deliveryNote = $state("");
+  let propNode = $state("");
+
+  // seed local form state when settings load
+  $effect(() => {
+    if ($settings && typeof $settings.propagation_node_hash === "string" && propNode === "") {
+      propNode = $settings.propagation_node_hash;
+    }
+  });
+
+  async function setDeliveryMethod(e: Event) {
+    const value = (e.currentTarget as HTMLSelectElement).value;
+    deliveryBusy = true;
+    deliveryNote = "";
+    try {
+      const updated = await api<Record<string, unknown>>("/api/v1/settings", {
+        method: "PUT",
+        body: JSON.stringify({ delivery_method: value }),
+      });
+      settings.set(updated);
+      deliveryNote = "Delivery method updated.";
+    } catch {
+      deliveryNote = "Could not update delivery method.";
+    } finally {
+      deliveryBusy = false;
+    }
+  }
+
+  async function savePropagationNode() {
+    deliveryBusy = true;
+    deliveryNote = "";
+    try {
+      const updated = await api<Record<string, unknown>>("/api/v1/settings", {
+        method: "PUT",
+        body: JSON.stringify({ propagation_node_hash: propNode.trim().toLowerCase() }),
+      });
+      settings.set(updated);
+      deliveryNote = "Propagation node saved. A message sync was attempted.";
+    } catch {
+      deliveryNote = "Invalid hash — 32 hex characters expected.";
+    } finally {
+      deliveryBusy = false;
+    }
+  }
 </script>
 
 <div class="h-full overflow-y-auto p-6 max-w-2xl">
@@ -132,6 +178,52 @@
       </div>
     {/if}
   </section>
+
+  {#if $mode === "advanced"}
+    <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
+      <h2 class="font-semibold mb-1">
+        Message delivery
+        <Tooltip text={TOOLTIPS.delivery_method_label} />
+      </h2>
+      <div class="space-y-3 mt-2">
+        <label class="block">
+          <span class="text-sm text-wp-dim">Delivery method</span>
+          <select
+            class="mt-1 w-full bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-sm"
+            value={$settings.delivery_method ?? "direct"}
+            onchange={setDeliveryMethod}
+            disabled={deliveryBusy}
+          >
+            <option value="direct">Direct (fastest — peer must be online)</option>
+            <option value="opportunistic">Opportunistic (direct, propagation fallback)</option>
+            <option value="propagated">Propagated (via a propagation node)</option>
+          </select>
+        </label>
+        <label class="block">
+          <span class="text-sm text-wp-dim">
+            Propagation node address
+            <Tooltip text={TOOLTIPS.propagation_node_hash} />
+          </span>
+          <div class="flex gap-2 mt-1">
+            <input
+              bind:value={propNode}
+              placeholder="32-character hash…"
+              class="flex-1 bg-wp-bg border border-wp-border rounded-lg px-3 py-2 font-mono text-xs
+                     focus:outline-none focus:border-wp-accent"
+            />
+            <button
+              onclick={savePropagationNode}
+              disabled={deliveryBusy}
+              class="bg-wp-panel2 border border-wp-border rounded-lg px-3 text-sm
+                     hover:border-wp-accent transition disabled:opacity-40"
+              >Save</button
+            >
+          </div>
+        </label>
+        {#if deliveryNote}<p class="text-xs text-wp-accent">{deliveryNote}</p>{/if}
+      </div>
+    </section>
+  {/if}
 
   {#if $mode === "advanced"}
     <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">

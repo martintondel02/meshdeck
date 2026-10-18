@@ -19,6 +19,7 @@ from waypoint.api.schemas import (
     require_hash,
     require_str,
 )
+from waypoint.chat.router import MAX_ATTACHMENT_TOTAL_BYTES
 from waypoint.core.events import Event
 from waypoint.core.service import CoreService
 
@@ -89,9 +90,14 @@ class ApiServer:
         app.router.add_get("/api/v1/identity", self._identity)
         app.router.add_post("/api/v1/identity/display_name", self._set_display_name)
         app.router.add_get("/api/v1/peers", self._peers)
+        app.router.add_post("/api/v1/peers", self._add_peer)
         app.router.add_patch("/api/v1/peers/{hash}", self._patch_peer)
         app.router.add_get("/api/v1/messages", self._messages)
         app.router.add_post("/api/v1/messages", self._send_message)
+        app.router.add_post("/api/v1/files", self._send_file)
+        app.router.add_get(
+            "/api/v1/attachments/{peer}/{msg}/{index}", self._download_attachment
+        )
         app.router.add_get("/api/v1/settings", self._get_settings)
         app.router.add_put("/api/v1/settings", self._put_settings)
         app.router.add_post("/api/v1/announce", self._announce)
@@ -111,8 +117,13 @@ class ApiServer:
             try:
                 site = web.TCPSite(self._runner, host, candidate)
                 await site.start()
-                self.bound_port = candidate
-                return candidate
+                resolved = candidate
+                if candidate == 0:  # ephemeral: read the actual port from the socket
+                    server_obj = getattr(site, "_server", None)
+                    if server_obj and server_obj.sockets:
+                        resolved = int(server_obj.sockets[0].getsockname()[1])
+                self.bound_port = resolved
+                return resolved
             except OSError as exc:
                 last_error = exc
                 continue
@@ -138,6 +149,11 @@ class ApiServer:
 
     async def _peers(self, request: web.Request) -> web.Response:
         return _json(self.service.list_peers())
+
+    async def _add_peer(self, request: web.Request) -> web.Response:
+        data = await request.json()
+        peer_hash = require_hash(data, "hash")
+        return _json(self.service.add_peer(peer_hash), status=201)
 
     async def _patch_peer(self, request: web.Request) -> web.Response:
         peer_hash = request.match_info["hash"]
@@ -178,6 +194,53 @@ class ApiServer:
 
     async def _announce(self, request: web.Request) -> web.Response:
         return _json(await self.service.announce_now())
+
+    async def _send_file(self, request: web.Request) -> web.Response:
+        """Multipart upload: fields 'peer' (hash), 'file' (the payload),
+        optional 'caption'. Enforces the attachment size cap while reading."""
+        if not request.content_type.startswith("multipart/"):
+            raise BadRequest("invalid_body", "expected multipart/form-data")
+        peer_hash: str | None = None
+        filename = "attachment"
+        caption = ""
+        data = bytearray()
+
+        reader = await request.multipart()
+        async for part in reader:  # type: ignore[union-attr]
+            if part.name == "peer":
+                peer_hash = (await part.text()).strip().lower()
+            elif part.name == "caption":
+                caption = (await part.text())[:512]
+            elif part.name == "file":
+                if part.filename:
+                    filename = part.filename
+                while True:
+                    chunk = await part.read_chunk(64 * 1024)
+                    if not chunk:
+                        break
+                    data.extend(chunk)
+                    if len(data) > MAX_ATTACHMENT_TOTAL_BYTES:
+                        raise BadRequest(
+                            "too_large",
+                            f"file exceeds {MAX_ATTACHMENT_TOTAL_BYTES} bytes",
+                        )
+        if peer_hash is None:
+            raise BadRequest("missing_peer", "multipart field 'peer' is required")
+        result = self.service.send_file(peer_hash, filename, bytes(data), caption)
+        return _json(result, status=202)
+
+    async def _download_attachment(self, request: web.Request) -> web.Response:
+        resolved = self.service.get_attachment(
+            request.match_info["peer"],
+            request.match_info["msg"],
+            int(request.match_info["index"]),
+        )
+        if resolved is None:
+            return _error(404, "not_found", "attachment not found")
+        path, safe_name = resolved
+        return web.FileResponse(
+            path, headers={"Content-Disposition": f'attachment; filename="{safe_name}"'}
+        )
 
     # -- WebSocket -----------------------------------------------------------
 

@@ -18,10 +18,11 @@
   import Onboarding from "./components/Onboarding.svelte";
   import PeerList from "./components/PeerList.svelte";
   import ChatView from "./components/ChatView.svelte";
+  import Guides from "./components/Guides.svelte";
   import Settings from "./components/Settings.svelte";
   import { TOOLTIPS } from "./lib/copy/tooltips";
 
-  type View = "chats" | "settings";
+  type View = "chats" | "guides" | "settings";
   let view = $state<View>("chats");
   let needsOnboarding = $state(false);
   let bootError = $state("");
@@ -122,6 +123,11 @@
         </button>
         <button
           class="px-3 py-1.5 rounded-lg text-sm transition-colors
+                 {view === 'guides' ? 'bg-wp-panel2 text-wp-text' : 'text-wp-dim hover:text-wp-text'}"
+          onclick={() => (view = "guides")}>Guides</button
+        >
+        <button
+          class="px-3 py-1.5 rounded-lg text-sm transition-colors
                  {view === 'settings' ? 'bg-wp-panel2 text-wp-text' : 'text-wp-dim hover:text-wp-text'}"
           onclick={() => (view = "settings")}>Settings</button
         >
@@ -135,6 +141,10 @@
         </aside>
         <section class="flex-1 min-w-0 bg-wp-bg">
           <ChatView />
+        </section>
+      {:else if view === "guides"}
+        <section class="flex-1 min-w-0 bg-wp-bg">
+          <Guides />
         </section>
       {:else}
         <section class="flex-1 min-w-0 bg-wp-bg">

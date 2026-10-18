@@ -6,23 +6,38 @@ The API layer only ever talks to this class; RNS/LXMF details stay inside.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import time
+from pathlib import Path
 from typing import Any
 
 import RNS
 
 from waypoint import __version__
 from waypoint.chat.peers import LxmfPeerAnnounceHandler
-from waypoint.chat.router import ChatRouter, MessageTooLargeError, PeerUnknownError
-from waypoint.config import DEFAULT_SETTINGS, VALID_MODES, AppPaths, SettingsStore
+from waypoint.chat.router import (
+    ChatRouter,
+    MessageTooLargeError,
+    PeerUnknownError,
+    PropagationNodeNotConfigured,
+    sanitize_filename,
+)
+from waypoint.config import (
+    DEFAULT_SETTINGS,
+    DELIVERY_METHODS,
+    VALID_MODES,
+    AppPaths,
+    SettingsStore,
+)
 from waypoint.core.events import Event, EventBus
 from waypoint.rns.identity import IdentityManager
 from waypoint.rns.stack import RnsStack
 from waypoint.storage import messages as msg_repo
 from waypoint.storage import peers as peer_repo
 from waypoint.storage.db import Database
-from waypoint.util.hexid import is_valid_hash_hex
+from waypoint.util.hexid import is_valid_hash_hex, is_valid_msg_hash_hex
 
 log = logging.getLogger(__name__)
 
@@ -81,13 +96,19 @@ class CoreService:
 
         self.chat = ChatRouter(
             self.paths.lxmf_dir,
+            self.paths.files_dir,
             self.identity,
             self.bus,
             display_name=self.settings.get("display_name") or "",
+            delivery_method=self.settings.get("delivery_method") or "direct",
+            propagation_node_hash=self.settings.get("propagation_node_hash") or "",
         )
         # NOTE: like RNS.Reticulum, LXMF.LXMRouter installs signal handlers in
         # its constructor — must run on the main thread. Construction is fast.
         self.chat.start()
+        # Fetch any messages held for us by a configured propagation node.
+        if self.settings.get("propagation_node_hash"):
+            await asyncio.to_thread(self.chat.sync_from_propagation_node)
 
         self.announce_handler = LxmfPeerAnnounceHandler(
             self.bus, own_destination_hash_hex=self.chat.delivery_destination_hash_hex
@@ -173,6 +194,11 @@ class CoreService:
                             "title": d.get("title"),
                             "content": d.get("content"),
                             "created_ts": d.get("ts"),
+                            "fields_json": json.dumps(
+                                {"attachments": d["attachments"]}
+                            )
+                            if d.get("attachments")
+                            else None,
                         },
                     )
                 elif event.type == "message_state":
@@ -230,16 +256,14 @@ class CoreService:
     ) -> list[dict[str, Any]]:
         return msg_repo.list_messages(self.db, peer_hash, before=before, limit=limit)
 
-    def send_message(self, peer_hash: str, content: str, title: str = "") -> dict[str, Any]:
-        """Raises KeyError-ish ValueError subclasses; callers map to codes."""
-        if not is_valid_hash_hex(peer_hash):
-            raise ValueError("invalid_hash")
-        try:
-            msg_hash = self.chat.send(peer_hash, content, title)
-        except PeerUnknownError:
-            raise ValueError("no_path") from None
-        except MessageTooLargeError:
-            raise ValueError("too_large") from None
+    def _record_outbound(
+        self,
+        msg_hash: str,
+        peer_hash: str,
+        title: str,
+        content: str,
+        attachments_meta: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         msg_repo.insert_message(
             self.db,
             {
@@ -249,12 +273,95 @@ class CoreService:
                 "state": msg_repo.SENDING,
                 "title": title,
                 "content": content,
+                "fields_json": json.dumps({"attachments": attachments_meta})
+                if attachments_meta
+                else None,
             },
         )
         self.bus.publish(
             "message_state", {"hash": msg_hash, "peer": peer_hash, "state": msg_repo.SENDING}
         )
         return {"hash": msg_hash, "state": msg_repo.SENDING, "peer": peer_hash}
+
+    def send_message(self, peer_hash: str, content: str, title: str = "") -> dict[str, Any]:
+        """Raises ValueError with a machine-readable code on failure."""
+        if not is_valid_hash_hex(peer_hash):
+            raise ValueError("invalid_hash")
+        try:
+            msg_hash = self.chat.send(peer_hash, content, title)
+        except PeerUnknownError:
+            raise ValueError("no_path") from None
+        except MessageTooLargeError:
+            raise ValueError("too_large") from None
+        except PropagationNodeNotConfigured:
+            raise ValueError("no_propagation_node") from None
+        return self._record_outbound(msg_hash, peer_hash, title, content)
+
+    def send_file(
+        self, peer_hash: str, filename: str, data: bytes, caption: str = ""
+    ) -> dict[str, Any]:
+        """Send one file as an LXMF attachment. Raises ValueError with a code."""
+        if not is_valid_hash_hex(peer_hash):
+            raise ValueError("invalid_hash")
+        try:
+            msg_hash = self.chat.send(
+                peer_hash, caption, attachments=[(filename, data)]
+            )
+        except PeerUnknownError:
+            raise ValueError("no_path") from None
+        except MessageTooLargeError as exc:
+            raise ValueError("too_large") from exc
+        except PropagationNodeNotConfigured:
+            raise ValueError("no_propagation_node") from None
+        attachments_meta = [
+            {
+                "name": sanitize_filename(filename),
+                "size": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            }
+        ]
+        return self._record_outbound(msg_hash, peer_hash, "", caption, attachments_meta)
+
+    def add_peer(self, peer_hash: str) -> dict[str, Any]:
+        """Manually add a peer by hash; requests a network path if unknown."""
+        if not is_valid_hash_hex(peer_hash):
+            raise ValueError("invalid_hash")
+        peer_hash = peer_hash.lower()
+        existing = peer_repo.get_peer(self.db, peer_hash)
+        dest_hash = bytes.fromhex(peer_hash)
+        identity = RNS.Identity.recall(dest_hash)
+        known = identity is not None
+        if not known:
+            RNS.Transport.request_path(dest_hash)
+        if existing is None:
+            peer_repo.ensure_peer(
+                self.db, peer_hash, identity.hash.hex() if identity else peer_hash
+            )
+        self.bus.publish(
+            "peer_added", {"hash": peer_hash, "known": known, "path_requested": not known}
+        )
+        return {
+            "peer": peer_repo.get_peer(self.db, peer_hash),
+            "known": known,
+            "path_requested": not known,
+        }
+
+    def get_attachment(
+        self, peer_hash: str, msg_hash: str, index: int
+    ) -> tuple[Path, str] | None:
+        """Resolve a stored inbound attachment for download. (path, safe_name)"""
+        if not (is_valid_hash_hex(peer_hash) and is_valid_msg_hash_hex(msg_hash)):
+            return None
+        if index < 0 or index > 64:
+            return None
+        base = self.paths.files_dir.resolve()
+        directory = (base / peer_hash / msg_hash).resolve()
+        if not directory.is_relative_to(base) or not directory.is_dir():
+            return None
+        for candidate in sorted(directory.glob(f"{index}_*")):
+            if candidate.is_file() and candidate.resolve().is_relative_to(base):
+                return candidate, candidate.name[len(str(index)) + 1 :]
+        return None
 
     def get_settings(self) -> dict[str, Any]:
         return self.settings.all()
@@ -266,9 +373,19 @@ class CoreService:
                 continue
             if key == "mode" and value not in VALID_MODES:
                 raise ValueError("invalid_mode")
+            if key == "delivery_method" and value not in DELIVERY_METHODS:
+                raise ValueError("invalid_delivery_method")
+            if key == "propagation_node_hash" and value and not is_valid_hash_hex(value):
+                raise ValueError("invalid_propagation_node")
             if key in RESTART_SETTINGS and self.settings.get(key) != value:
                 restart_required = True
             self.settings.set(key, value)
+        if any(k in updates for k in ("delivery_method", "propagation_node_hash")):
+            applied = self.chat.apply_delivery_settings(
+                method=self.settings.get("delivery_method"),
+                propagation_node_hash=self.settings.get("propagation_node_hash"),
+            )
+            self.bus.publish("settings_updated", applied)
         result = self.settings.all()
         result["restart_required"] = restart_required
         return result

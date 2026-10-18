@@ -47,3 +47,26 @@ export function wsUrl(): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${window.location.host}/ws?token=${getToken()}`;
 }
+
+/** Multipart file upload (no JSON content-type). Returns the 202 body. */
+export async function uploadFile<T = unknown>(
+  path: string,
+  form: FormData,
+): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: form,
+  });
+  if (!res.ok) {
+    let code = `${res.status}`;
+    try {
+      const body = await res.json();
+      code = body?.error?.code ?? code;
+    } catch {
+      /* non-JSON */
+    }
+    throw new Error(code);
+  }
+  return (await res.json()) as T;
+}

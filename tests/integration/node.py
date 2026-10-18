@@ -39,6 +39,7 @@ async def run(args: argparse.Namespace) -> int:
 
     peer_found = asyncio.Event()
     sent_hash: dict[str, str] = {}
+    return_code = [0]
 
     async def on_event(event) -> None:
         if event.type == "peer_announced":
@@ -47,8 +48,17 @@ async def run(args: argparse.Namespace) -> int:
                 peer_found.set()
         elif event.type == "message_received":
             jlog(event="message_received", **{k: v for k, v in event.data.items()})
-            if args.expect and event.data.get("content") == args.expect:
+            matched_text = args.expect and event.data.get("content") == args.expect
+            matched_files = args.expect_attachments and event.data.get("attachments")
+            if matched_text or matched_files:
                 if not args.expect_from or event.data.get("peer") == args.expect_from:
+                    if args.reply:
+                        try:
+                            service.send_message(event.data["peer"], args.reply)
+                            jlog(event="replied", to=event.data["peer"])
+                        except ValueError as exc:
+                            jlog(event="reply_failed", reason=str(exc))
+                            return_code[0] = 1
                     result["ok"] = True
                     result["got"] = event.data
                     done_condition.set()
@@ -58,6 +68,7 @@ async def run(args: argparse.Namespace) -> int:
                 event.data.get("state") == "delivered"
                 and sent_hash
                 and event.data.get("hash") == sent_hash["hash"]
+                and not args.expect  # when expecting a reply, done waits for it
             ):
                 result["ok"] = True
                 result["delivered"] = sent_hash["hash"]
@@ -80,7 +91,7 @@ async def run(args: argparse.Namespace) -> int:
 
     asyncio.create_task(announce_loop())
 
-    if args.send_to and args.message:
+    if args.send_to and (args.message or args.send_file):
         async def sender() -> None:
             try:
                 await asyncio.wait_for(peer_found.wait(), timeout=args.timeout)
@@ -89,7 +100,13 @@ async def run(args: argparse.Namespace) -> int:
                 return
             while not done_condition.is_set():
                 try:
-                    res = service.send_message(args.send_to, args.message)
+                    if args.send_file:
+                        file_path = Path(args.send_file)
+                        res = service.send_file(
+                            args.send_to, file_path.name, file_path.read_bytes()
+                        )
+                    else:
+                        res = service.send_message(args.send_to, args.message)
                     sent_hash["hash"] = res["hash"]
                     jlog(event="sent", **res)
                     return
@@ -112,7 +129,7 @@ async def run(args: argparse.Namespace) -> int:
     Path(args.done_file).write_text(json.dumps(result), encoding="utf-8")
     jlog(event="done", **result)
     await service.stop()
-    return 0
+    return return_code[0]
 
 
 def main() -> int:
@@ -124,8 +141,12 @@ def main() -> int:
     parser.add_argument("--no-autointerface", action="store_true")
     parser.add_argument("--send-to", default=None)
     parser.add_argument("--message", default=None)
+    parser.add_argument("--send-file", default=None, help="path to a file to send")
     parser.add_argument("--expect", default=None)
+    parser.add_argument("--expect-attachments", action="store_true")
     parser.add_argument("--expect-from", default=None)
+    parser.add_argument("--reply", default=None,
+                        help="reply with this text when the expect condition matches")
     parser.add_argument("--ready-file", required=True)
     parser.add_argument("--done-file", required=True)
     parser.add_argument("--timeout", type=int, default=120)

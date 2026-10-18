@@ -58,6 +58,7 @@ function handleEvent(event: string, data: Record<string, unknown>): void {
     }
     case "message_received": {
       const hash = data.peer as string;
+      const attachments = data.attachments as unknown[] | undefined;
       upsertMessage(hash, {
         id: -Date.now(),
         hash: data.hash as string,
@@ -66,6 +67,9 @@ function handleEvent(event: string, data: Record<string, unknown>): void {
         state: "received",
         title: (data.title as string) ?? null,
         content: (data.content as string) ?? null,
+        fields_json: attachments?.length
+          ? JSON.stringify({ attachments })
+          : null,
         created_ts: (data.ts as number) ?? Date.now() / 1000,
         delivered_ts: null,
       });
@@ -102,6 +106,7 @@ function handleEvent(event: string, data: Record<string, unknown>): void {
       break;
     }
     case "peer_updated":
+    case "peer_added":
       // refetch peer list for simplicity
       api<Peer[]>("/api/v1/peers").then((p) => peers.set(p));
       break;

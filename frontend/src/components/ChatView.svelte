@@ -1,8 +1,11 @@
 <script lang="ts">
-  import { api } from "../lib/api";
+  import { api, getToken, uploadFile } from "../lib/api";
   import { clockTime } from "../lib/format";
   import {
     activePeer,
+    attachmentUrl,
+    attachmentsOf,
+    humanSize,
     messages,
     peers,
     peerLabel,
@@ -13,10 +16,14 @@
   import Tooltip from "./Tooltip.svelte";
   import { TOOLTIPS } from "../lib/copy/tooltips";
 
+  const MAX_ATTACHMENT_BYTES = 1536 * 1024; // must match the backend cap
+
   let draft = $state("");
   let sending = $state(false);
   let sendError = $state("");
   let scrollBox: HTMLDivElement | undefined = $state();
+  let fileInput: HTMLInputElement | undefined = $state();
+  let fileSending = $state(false);
 
   const peer = $derived($peers.find((p) => p.hash === $activePeer) ?? null);
   const msgs = $derived($activePeer ? ($messages[$activePeer] ?? []) : []);
@@ -66,38 +73,96 @@
     }
   }
 
+  function sendErrorText(code: string): string {
+    if (code === "no_path") return TOOLTIPS.no_path_error;
+    if (code === "too_large") return "This file is too large for the current transfer limit.";
+    if (code === "no_propagation_node")
+      return "Propagation delivery selected, but no propagation node is configured (Advanced→Settings).";
+    return "Message failed before it could be sent.";
+  }
+
+  function optimisticMessage(
+    peerHash: string,
+    res: { hash: string },
+    content: string,
+    attachments?: ChatMessage["fields_json"],
+  ): ChatMessage {
+    return {
+      id: -Date.now(),
+      hash: res.hash,
+      peer_hash: peerHash,
+      direction: "out",
+      state: "sending",
+      title: null,
+      content,
+      fields_json: attachments ?? null,
+      created_ts: Date.now() / 1000,
+      delivered_ts: null,
+    };
+  }
+
   async function send() {
     if (!draft.trim() || !$activePeer || sending) return;
     sending = true;
     sendError = "";
     const content = draft.trim();
+    const targetPeer = $activePeer;
     try {
       const res = await wsCmd<{ hash?: string; __error?: { message: string } }>(
         "send_message",
-        { peer: $activePeer, content },
+        { peer: targetPeer, content },
       );
       if (res.__error) {
-        sendError =
-          res.__error.message ??
-          "Message failed before it could be sent (peer not reachable yet?)";
+        sendError = sendErrorText(res.__error.message);
       } else if (res.hash) {
-        upsertMessage($activePeer, {
-          id: -Date.now(),
-          hash: res.hash,
-          peer_hash: $activePeer,
-          direction: "out",
-          state: "sending",
-          title: null,
-          content,
-          created_ts: Date.now() / 1000,
-          delivered_ts: null,
-        });
+        upsertMessage(
+          targetPeer,
+          optimisticMessage(targetPeer, { hash: res.hash }, content),
+        );
         draft = "";
       }
     } catch {
       sendError = "Not connected to the Waypoint daemon.";
     } finally {
       sending = false;
+    }
+  }
+
+  async function sendSelectedFile(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ""; // allow re-selecting the same file
+    if (!file || !$activePeer || fileSending) return;
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      sendError = `“${file.name}” is ${humanSize(file.size)} — the current limit is ${humanSize(MAX_ATTACHMENT_BYTES)}.`;
+      return;
+    }
+    fileSending = true;
+    sendError = "";
+    const targetPeer = $activePeer;
+    const caption = draft.trim();
+    try {
+      const form = new FormData();
+      form.append("peer", targetPeer);
+      form.append("file", file);
+      if (caption) form.append("caption", caption);
+      const res = await uploadFile<{ hash: string }>("/api/v1/files", form);
+      upsertMessage(
+        targetPeer,
+        optimisticMessage(
+          targetPeer,
+          res,
+          caption,
+          JSON.stringify({
+            attachments: [{ index: 0, name: file.name, size: file.size }],
+          }),
+        ),
+      );
+      draft = "";
+    } catch (err) {
+      sendError = sendErrorText(err instanceof Error ? err.message : "");
+    } finally {
+      fileSending = false;
     }
   }
 </script>
@@ -126,7 +191,22 @@
               ? 'bg-wp-accent2/20 border border-wp-accent2/30'
               : 'bg-wp-panel2 border border-wp-border'}"
           >
-            <p class="whitespace-pre-wrap break-words">{msg.content}</p>
+            {#if msg.content}
+              <p class="whitespace-pre-wrap break-words">{msg.content}</p>
+            {/if}
+            {#each attachmentsOf(msg) as att (att.index)}
+              <a
+                href="{attachmentUrl(peer.hash, msg, att.index)}?token={getToken()}"
+                class="flex items-center gap-2 mt-1.5 px-3 py-2 rounded-lg bg-wp-bg/60
+                       border border-wp-border hover:border-wp-accent transition-colors group"
+                title="Download {att.name}"
+              >
+                <span class="text-base">📎</span>
+                <span class="truncate font-mono text-xs">{att.name}</span>
+                <span class="text-[11px] text-wp-dim shrink-0">{humanSize(att.size)}</span>
+                <span class="text-wp-accent opacity-0 group-hover:opacity-100 transition shrink-0">⬇</span>
+              </a>
+            {/each}
             <div class="flex items-center gap-1.5 justify-end mt-1 text-[11px] text-wp-dim">
               <span>{clockTime(msg.created_ts)}</span>
               {#if msg.direction === "out"}
@@ -142,14 +222,32 @@
     </div>
 
     {#if sendError}
-      <div class="px-5 pb-1 text-xs text-wp-danger">{sendError}</div>
+      <div class="px-5 pb-1 text-xs text-wp-danger flex items-center gap-1">
+        {sendError}
+        {#if sendError === TOOLTIPS.no_path_error}<Tooltip text={TOOLTIPS.announce} />{/if}
+      </div>
     {/if}
 
-    <div class="p-4 border-t border-wp-border flex gap-2">
+    <div class="p-4 border-t border-wp-border flex gap-2 items-center">
+      <input
+        bind:this={fileInput}
+        type="file"
+        class="hidden"
+        onchange={sendSelectedFile}
+      />
+      <button
+        onclick={() => fileInput?.click()}
+        disabled={fileSending}
+        class="bg-wp-panel2 border border-wp-border rounded-xl px-3.5 py-2.5
+               hover:border-wp-accent transition disabled:opacity-40"
+        title="Send a file (up to {humanSize(MAX_ATTACHMENT_BYTES)})"
+      >
+        {fileSending ? "⏳" : "📎"}
+      </button>
       <input
         bind:value={draft}
         onkeydown={(e) => e.key === "Enter" && send()}
-        placeholder="Type a message…"
+        placeholder="Type a message… (or attach a file)"
         class="flex-1 bg-wp-bg border border-wp-border rounded-xl px-4 py-2.5
                focus:outline-none focus:border-wp-accent transition-colors"
       />

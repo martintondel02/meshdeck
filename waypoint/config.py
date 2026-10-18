@@ -24,7 +24,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "announce_interval_minutes": 15,
     "log_level": 4,
     "transport_enabled": False,
+    # Phase 2: delivery behaviour
+    "delivery_method": "direct",  # "direct" | "propagated" | "opportunistic"
+    "propagation_node_hash": "",  # hex hash of an LXMF propagation node
 }
+
+DELIVERY_METHODS = ("direct", "propagated", "opportunistic")
 
 VALID_MODES = ("basic", "advanced")
 

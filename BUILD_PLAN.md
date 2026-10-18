@@ -283,10 +283,13 @@ with 401. The CLI prints the URL with token on start; `--open-browser` opens it.
 | GET | `/api/v1/identity` | `{hash, display_name, short}` |
 | POST | `/api/v1/identity/display_name` | set + re-announce |
 | GET | `/api/v1/peers` | list known peers (hash, name, last_seen, nickname, blocked) |
+| POST | `/api/v1/peers` | `{hash}` → add by address; `{peer, known, path_requested}` (Phase 2) |
 | PATCH | `/api/v1/peers/{hash}` | rename/block |
 | GET | `/api/v1/messages?peer={hash}&before={ts}&limit=50` | paginated history |
 | POST | `/api/v1/messages` | `{peer, content, title?}` → `{hash, state}` |
-| GET/PUT | `/api/v1/settings` | settings incl. `mode: basic\|advanced` |
+| POST | `/api/v1/files` | multipart `peer` + `file` (+`caption`) → `{hash, state}` (Phase 2) |
+| GET | `/api/v1/attachments/{peer}/{msg}/{index}` | download a stored attachment (Phase 2) |
+| GET/PUT | `/api/v1/settings` | settings incl. `mode`, `delivery_method`, `propagation_node_hash` |
 | POST | `/api/v1/announce` | re-announce self now |
 
 ### WebSocket `/ws`
@@ -297,8 +300,36 @@ Client→server: `{type:"cmd", id:<n>, cmd:"send_message", data:{...}}`
 Server→client ack: `{type:"ack", id:<n>, ok:true, data:{...}}` or
 `{type:"error", id:<n>, ok:false, error:{code, message}}`
 Server→client events: `{type:"event", event:<name>, data:{...}}` with
-`event ∈ peer_announced | peer_updated | message_received | message_state |
-network_status | interfaces_changed`.
+`event ∈ peer_announced | peer_added | peer_updated | message_received |
+message_state | network_status | interfaces_changed`.
+
+Error codes over REST/WS include: `invalid_hash`, `no_path`, `too_large`,
+`no_propagation_node`, `not_found`, `missing_peer`, `invalid_mode`,
+`invalid_delivery_method`, `invalid_propagation_node`.
+
+### Attachments (Phase 2 wire format)
+
+Outbound sets `LXMF.FIELD_FILE_ATTACHMENTS (0x05)` to
+`[[name_bytes, data_bytes], …]`. Filenames are sanitized before storage:
+URL-decode → basename → replace non-`[A-Za-z0-9._-]` → cap 120 chars.
+Inbound files land in `<data>/files/<peer_hash>/<msg_hash>/<index>_<name>`.
+App cap **1.5 MiB per message**; router inbound `delivery_limit=2048` KB
+(LXMF defaults to 1000 KB, and legacy clients enforce ~1 MB inbound —
+oversize cross-client sends fail cleanly with state `failed`).
+
+CAREFUL: LXMF **message** hashes are full SHA-256 → **64** hex chars,
+unlike destination hashes (32). Mixing them in validators silently breaks
+attachment download routes (`is_valid_msg_hash_hex` exists for this).
+
+### Propagation (Phase 2 plumbing, Phase 3 polish)
+
+Settings `delivery_method` (`direct|opportunistic|propagated`) and
+`propagation_node_hash` apply live (no restart) via
+`ChatRouter.apply_delivery_settings` (`router.set_outbound_propagation_node(bytes)`).
+On startup, if a propagation node is configured and recallable,
+`request_messages_from_propagation_node(identity)` syncs stored messages.
+Stamp costs (proof-of-work for propagated delivery) surface as send errors;
+automatic stamp generation is a Phase 3 task.
 
 No auth beyond the token; bind is loopback-only.
 
@@ -630,10 +661,23 @@ REST/WS API (auth enforced, discovery, delivery receipts, live WS events).
 - [x] 13. Phase 1 DoD manual test: two instances exchange chat (curl/WS-driven)
 - [x] 14. `Makefile`, README dev quickstart refresh, CHANGELOG start
 
-**Phase 2 (next):** contacts UX polish, manual add-by-hash + path-request
-handling in the UI ("waiting for path" state), history search, LXMF file
-attachments (`FIELD_FILE_ATTACHMENTS`), propagation-node fallback, automated
-API tests, two-way integration test (reply round-trip).
+**Phase 2 — contacts, attachments, delivery control — DONE 2026-10-18.**
+Verified with `tests/api` (real HTTP+WS against a booted daemon) and three
+two-node tests: chat, reply round-trip, 1 MiB file transfer with SHA-256
+equality on the receiver side; oversize uploads return `too_large` (400).
+
+- [x] 15. Manual add-by-hash (`POST /peers`), path requested when unknown
+- [x] 16. Contacts UX: rename, block, add; peer options menu
+- [x] 17. File attachments send/receive + download route + sanitization
+- [x] 18. Integration tests: reply round-trip + 1 MiB file hash check
+- [x] 19. Automated API tests (auth, validation, no_path, WS ping/err)
+- [x] 20. Delivery settings: method + propagation node, live-applied
+- [x] 21. In-app Guides view + repo guide docs
+
+**Phase 3 (next):** interface wizard + entrypoint list editor, hosted
+interface wizards, stamp-cost handling (auto PoW for propagated sends),
+LXMF image/audio previews (`FIELD_IMAGE`/`FIELD_AUDIO`), history search UI,
+packaging (PyInstaller one-file binary + Flatpak manifest start).
 
 ---
 

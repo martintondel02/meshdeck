@@ -25,6 +25,16 @@ export const TOOLTIPS = {
     "Automatically finds other Reticulum users on your local network (Wi‑Fi/LAN). No configuration needed — great for testing.",
   announce_interval:
     "How often your address is re-broadcast so the network keeps a fresh path to you.",
+  no_path_error:
+    "We don't know a network path to this peer yet. This usually fixes itself within a minute once they announce — keep both nodes online and try again.",
+  add_peer:
+    "Paste a friend's address (their 32-character hash, from their Me page) to add them even if they haven't announced yet. We'll ask the network for a path.",
+  delivery_method_label:
+    "Direct sends straight to the peer when they're online. Opportunistic tries direct, then falls back to a propagation node. Propagated always uses the propagation node (offline-capable, slower).",
+  propagation_node_hash:
+    "The hash of an LXMF propagation node that stores messages for offline peers. Ask the node's operator how to reach it, then paste its hash here.",
+  attachments:
+    "Files ride inside the LXMF message itself — encrypted and signed like chat text. Large files take a while; the message shows delivery status just like chat.",
 } as const;
 
 export const GLOSSARY = {
