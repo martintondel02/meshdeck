@@ -516,37 +516,27 @@ Builder: run `.venv/bin/python -c "import RNS, LXMF"` to confirm.
 - Offline delivery: propagation fallback setting + sync on startup.
 - DoD: integration test sends a 1 MiB file between two nodes and verifies
   hash equality; UI shows progress both sides.
+- ✅ Shipped (commit `7c72cb2`): attachments, add-by-hash contacts, rename/
+  block, delivery methods + propagation node setting, in-app guides.
 
-### Phase 3 — Host a page/site
-- Node destination per user: app `meshdeck`, aspect `node`; request handler
-  serves micron pages + files (study NomadNet's node implementation and the
-  "Serving Pages Over Nomad Network" manual section).
-- Basic: visual micron editor (toolbar inserts micron syntax; live preview
-  via our own micron renderer in JS — RFnexus' micron-parser-js is the
-  reference).
-- Advanced: raw micron editor, file attachments, node announce management.
-- DoD: instance A publishes a page; instance B (advanced, or test script)
-  fetches it via Link request and renders it.
+### Phase 3 — Advanced mode tooling ✅ (shipped, renumbered)
+Interfaces wizard (structured `interfaces` settings, snippet import, hosting
+wizards, gateway mode, announce-rate presets), transport-node toggle,
+`POST /restart` with config pre-flight + process re-exec, stamp-cost sending
+via LXMF's deferred PoW pool, history search, and PyInstaller packaging
+(`make package`). Commit `e51d10c`.
 
-### Phase 4 — Advanced mode tooling
-- Interface editor (all common RNS interface types incl. TCP/Backbone/UDP/
-  RNode-serial; IFAC fields; announce-rate guidance baked into the form).
-- Transport toggle, public entrypoint wizard (BackboneInterface, `mode =
-  gateway`, announce_rate_* presets with explanations), propagation-node
-  hosting (`router.enable_propagation()`).
-- Diagnostics: announce table, path table, `rnpath`/`rnprobe` equivalents,
-  live log tail, connection doctor heuristics.
-- Blackhole management UI.
-- DoD: user can turn a fresh MeshDeck install into a working TCP-gateway
-  entrypoint in ≤5 clicks without editing text; `rnstatus`-equivalent view
-  renders real interface data.
+### Phase 4 — Pages, sites and node file hosting ✅ (part 1 + 2 shipped)
+NomadNet-compatible `nomadnetwork.node` destination: `/page/<name>` and
+`/file/<name>` request handlers, node announces + discovery (`nodes` table,
+schema v2), RNS-Link client for fetching pages and files, micron editor with
+live preview, reader, shared-file UI. Commits `a3f028e`, `107cff9`.
 
-### Phase 5 — Packaging & docs
-- PyPI package (console script `meshdeck`), Docker image, systemd unit file,
-  desktop shell spike (Tauri first), GitHub Actions: lint+test matrix
-  (Linux/macOS/Windows; Python 3.11–3.14), release workflow building wheels.
-- Docs site from `docs/guides` (same markdown as in-app), CONTRIBUTING.md,
-  screenshots, first tagged release `v0.1.0`.
+### Phase 5 — Release readiness (next)
+CI, transfer progress, page cache, propagation-node hosting, a11y, i18n
+extraction, release artifacts (tarball / AppImage / Flatpak), `v0.1.0` tag.
+**Full execution spec: [`NEXT_STEPS.md`](NEXT_STEPS.md)** — that file is the
+authoritative task list; this section is only the summary.
 
 ---
 
@@ -749,7 +739,7 @@ Windows exe from the PyInstaller base), accessibility pass, first public tag.
 
 ---
 
-## 13. RNS/LXMF integration recipe (the critical path)
+## 16. RNS/LXMF integration recipe (appendix: the critical path)
 
 ---
 

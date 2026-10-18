@@ -75,7 +75,7 @@ no Python install needed.
 `python -m meshdeck --data-dir /tmp/x --port 8570` runs an isolated instance —
 handy for local two-instance chats. Current status: **Phase 3 done**
 (chat, files, contacts, interfaces + hosting wizards, stamps, packaging);
-see [BUILD_PLAN.md §12/§15](BUILD_PLAN.md).
+see [BUILD_PLAN.md §12/§15](BUILD_PLAN.md). The authoritative task list for what's next (Phase 4 remainder + release readiness) is [NEXT_STEPS.md](NEXT_STEPS.md).
 
 ## License
 
