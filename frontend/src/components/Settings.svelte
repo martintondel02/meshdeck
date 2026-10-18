@@ -5,6 +5,7 @@
   import Tooltip from "./Tooltip.svelte";
   import InterfacesCard from "./InterfacesCard.svelte";
   import { GLOSSARY, TOOLTIPS } from "../lib/copy/tooltips";
+  import { t } from "../lib/i18n";
 
   let announceBusy = $state(false);
   let copied = $state(false);
@@ -62,9 +63,9 @@
         body: JSON.stringify({ delivery_method: value }),
       });
       settings.set(updated);
-      deliveryNote = "Delivery method updated.";
+      deliveryNote = t("settings.delivery_updated");
     } catch {
-      deliveryNote = "Could not update delivery method.";
+      deliveryNote = t("settings.delivery_error");
     } finally {
       deliveryBusy = false;
     }
@@ -81,10 +82,10 @@
       });
       settings.set(updated);
       hostNote = value
-        ? "Hosting enabled — peers can now use the address below."
-        : "Hosting disabled.";
+        ? t("settings.hosting_enabled")
+        : t("settings.hosting_disabled");
     } catch {
-      hostNote = "Could not change propagation hosting.";
+      hostNote = t("settings.hosting_error");
     } finally {
       hostBusy = false;
     }
@@ -107,9 +108,9 @@
         body: JSON.stringify({ propagation_node_hash: propNode.trim().toLowerCase() }),
       });
       settings.set(updated);
-      deliveryNote = "Propagation node saved. A message sync was attempted.";
+      deliveryNote = t("settings.prop_node_saved");
     } catch {
-      deliveryNote = "Invalid hash — 32 hex characters expected.";
+      deliveryNote = t("settings.prop_node_invalid");
     } finally {
       deliveryBusy = false;
     }
@@ -117,12 +118,12 @@
 </script>
 
 <div class="h-full overflow-y-auto p-6 max-w-2xl">
-  <h1 class="text-xl font-bold mb-6">Settings</h1>
+  <h1 class="text-xl font-bold mb-6">{t("settings.title")}</h1>
 
   <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
-    <h2 class="font-semibold mb-1">Your address</h2>
+    <h2 class="font-semibold mb-1">{t("settings.your_address")}</h2>
     <p class="text-sm text-wp-dim mb-3">
-      Share this with people you want to talk to.
+      {t("settings.share_hint")}
       <Tooltip text={TOOLTIPS.address} />
     </p>
     <div class="flex items-center gap-2">
@@ -131,26 +132,26 @@
       </code>
       <button
         onclick={copyAddress}
-        aria-label="Copy your chat address"
+        aria-label={t("settings.copy_aria")}
         class="bg-wp-panel2 border border-wp-border rounded-lg px-3 py-2 text-sm hover:border-wp-accent transition-colors"
-        >{copied ? "Copied!" : "Copy"}</button
+        >{copied ? t("common.copied") : t("common.copy")}</button
       >
     </div>
     <p class="text-xs text-wp-dim mt-2">
-      Signed in as <b>{$identity?.display_name || "(unnamed)"}</b> ·
+      {t("settings.signed_in_as")} <b>{$identity?.display_name || t("settings.unnamed")}</b> ·
       <Tooltip text={TOOLTIPS.display_name} />
     </p>
   </section>
 
   <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
     <h2 class="font-semibold mb-1">
-      Mode
+      {t("settings.mode")}
       <Tooltip text={TOOLTIPS.mode_toggle} />
     </h2>
     <p class="text-sm text-wp-dim mb-3">
       {$mode === "basic"
-        ? "Basic mode is on: a clean, guided experience."
-        : "Advanced mode is on: network controls and diagnostics unlocked."}
+        ? t("settings.mode_basic_hint")
+        : t("settings.mode_advanced_hint")}
     </p>
     <button
       onclick={toggleMode}
@@ -159,31 +160,39 @@
         ? 'bg-wp-warn/15 border-wp-warn text-wp-warn'
         : 'bg-wp-accent/15 border-wp-accent text-wp-accent'}"
     >
-      Switch to {$mode === "basic" ? "Advanced" : "Basic"} mode
+      {t("settings.switch_mode", {
+        mode:
+          $mode === "basic"
+            ? t("settings.mode_advanced_name")
+            : t("settings.mode_basic_name"),
+      })}
     </button>
   </section>
 
   <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
-    <h2 class="font-semibold mb-1">Network</h2>
+    <h2 class="font-semibold mb-1">{t("settings.network")}</h2>
     <p class="text-sm text-wp-dim mb-3">
       {$status?.rns_running
-        ? `Connected via ${$status.interfaces.length} interface(s).`
-        : "Reticulum is not running."}
+        ? t(
+            $status.interfaces.length === 1
+              ? "settings.connected_via_one"
+              : "settings.connected_via_other",
+            { count: $status.interfaces.length },
+          )
+        : t("settings.rns_not_running")}
     </p>
     <button
       onclick={announceNow}
       disabled={announceBusy}
       class="bg-wp-panel2 border border-wp-border rounded-lg px-4 py-2 text-sm hover:border-wp-accent transition-colors disabled:opacity-40"
     >
-      {announceBusy ? "Announcing…" : "Announce myself now"}
+      {announceBusy ? t("settings.announcing") : t("settings.announce_now")}
     </button>
     <Tooltip text={TOOLTIPS.announce} />
 
     {#if $mode === "basic"}
       <p class="text-xs text-wp-dim mt-3">
-        To reach beyond your local network, enable advanced mode and use the
-        interfaces wizard — or ask a friend for their connection snippet.
-        Community directories:
+        {t("settings.reach_beyond")}
         <a class="text-wp-accent hover:underline" href="https://directory.rns.recipes/" target="_blank" rel="noreferrer">directory.rns.recipes</a>,
         <a class="text-wp-accent hover:underline" href="https://rmap.world/" target="_blank" rel="noreferrer">rmap.world</a>.
       </p>
@@ -191,14 +200,14 @@
 
     {#if $mode === "advanced" && $status}
       <div class="mt-4 border-t border-wp-border pt-4">
-        <h3 class="text-sm font-semibold mb-2 text-wp-dim uppercase tracking-wide">Interfaces</h3>
+        <h3 class="text-sm font-semibold mb-2 text-wp-dim uppercase tracking-wide">{t("settings.interfaces")}</h3>
         <table class="w-full text-sm">
           <thead>
             <tr class="text-left text-wp-dim text-xs">
-              <th class="pb-1">Name</th>
-              <th class="pb-1">Type</th>
-              <th class="pb-1">State</th>
-              <th class="pb-1 text-right">Bitrate</th>
+              <th class="pb-1">{t("settings.col_name")}</th>
+              <th class="pb-1">{t("settings.col_type")}</th>
+              <th class="pb-1">{t("settings.col_state")}</th>
+              <th class="pb-1 text-right">{t("settings.col_bitrate")}</th>
             </tr>
           </thead>
           <tbody>
@@ -208,11 +217,17 @@
                 <td class="py-1.5 pr-2">{iface.type}</td>
                 <td class="py-1.5 pr-2">
                   <span class={iface.online ? "text-wp-accent" : "text-wp-danger"}
-                    >{iface.online ? "online" : "offline"}</span
+                    >{iface.online
+                      ? t("settings.iface_online")
+                      : t("settings.iface_offline")}</span
                   >
                 </td>
                 <td class="py-1.5 text-right text-wp-dim">
-                  {iface.bitrate ? `${Math.round(iface.bitrate / 1000)} kbps` : "—"}
+                  {iface.bitrate
+                    ? t("settings.bitrate_kbps", {
+                        kbps: Math.round(iface.bitrate / 1000),
+                      })
+                    : "—"}
                 </td>
               </tr>
             {/each}
@@ -225,7 +240,7 @@
   {#if $mode === "advanced"}
     <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
       <h2 class="font-semibold mb-1">
-        Interfaces
+        {t("settings.interfaces")}
         <Tooltip text={TOOLTIPS.hosting_entrypoint} />
       </h2>
       <InterfacesCard />
@@ -233,7 +248,7 @@
 
     <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
       <h2 class="font-semibold mb-1">
-        Transport node
+        {t("settings.transport_node")}
         <Tooltip text={TOOLTIPS.transport_node_setting} />
       </h2>
       <label class="flex items-center gap-2 mt-2 text-sm cursor-pointer">
@@ -251,11 +266,11 @@
             restartNote = true;
           }}
         />
-        Carry traffic for other nodes (enable_transport)
+        {t("settings.transport_carry")}
       </label>
       {#if Boolean($settings.transport_enabled)}
         <p class="text-xs text-wp-warn mt-2">
-          Transport nodes serve the mesh; run one on stable, well-connected machines only.
+          {t("settings.transport_warn")}
         </p>
       {/if}
     </section>
@@ -264,32 +279,32 @@
   {#if $mode === "advanced"}
     <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
       <h2 class="font-semibold mb-1">
-        Message delivery
+        {t("settings.message_delivery")}
         <Tooltip text={TOOLTIPS.delivery_method_label} />
       </h2>
       <div class="space-y-3 mt-2">
         <label class="block">
-          <span class="text-sm text-wp-dim">Delivery method</span>
+          <span class="text-sm text-wp-dim">{t("settings.delivery_method")}</span>
           <select
             class="mt-1 w-full bg-wp-bg border border-wp-border rounded-lg px-3 py-2 text-sm"
             value={$settings.delivery_method ?? "direct"}
             onchange={setDeliveryMethod}
             disabled={deliveryBusy}
           >
-            <option value="direct">Direct (fastest — peer must be online)</option>
-            <option value="opportunistic">Opportunistic (direct, propagation fallback)</option>
-            <option value="propagated">Propagated (via a propagation node)</option>
+            <option value="direct">{t("settings.delivery_direct")}</option>
+            <option value="opportunistic">{t("settings.delivery_opportunistic")}</option>
+            <option value="propagated">{t("settings.delivery_propagated")}</option>
           </select>
         </label>
         <label class="block">
           <span class="text-sm text-wp-dim">
-            Propagation node address
+            {t("settings.prop_node_address")}
             <Tooltip text={TOOLTIPS.propagation_node_hash} />
           </span>
           <div class="flex gap-2 mt-1">
             <input
               bind:value={propNode}
-              placeholder="32-character hash…"
+              placeholder={t("common.hash_placeholder")}
               class="flex-1 bg-wp-bg border border-wp-border rounded-lg px-3 py-2 font-mono text-xs
                      focus:outline-none focus:border-wp-accent"
             />
@@ -298,7 +313,7 @@
               disabled={deliveryBusy}
               class="bg-wp-panel2 border border-wp-border rounded-lg px-3 text-sm
                      hover:border-wp-accent transition disabled:opacity-40"
-              >Save</button
+              >{t("common.save")}</button
             >
           </div>
         </label>
@@ -312,13 +327,11 @@
   {#if $mode === "advanced"}
     <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
       <h2 class="font-semibold mb-1">
-        Host for others (propagation node)
+        {t("settings.host_section")}
         <Tooltip text={TOOLTIPS.propagation_hosting} />
       </h2>
       <p class="text-sm text-wp-dim mb-3">
-        Store-and-forward for LXMF: when a peer is offline, your node holds
-        their encrypted messages until they return. This is infrastructure
-        other people can rely on — it costs disk, bandwidth and uptime.
+        {t("settings.host_intro")}
       </p>
       <label class="flex items-center gap-2 text-sm cursor-pointer">
         <input
@@ -328,11 +341,11 @@
           disabled={hostBusy}
           onchange={togglePropagationHosting}
         />
-        Host a propagation node
+        {t("settings.host_toggle")}
       </label>
       <div class="mt-3">
         <p class="text-sm text-wp-dim mb-1">
-          Your propagation node address (share this — not your chat address):
+          {t("settings.prop_address_label")}
         </p>
         <div class="flex items-center gap-2">
           <code
@@ -343,15 +356,14 @@
           <button
             onclick={copyPropagationAddress}
             class="bg-wp-panel2 border border-wp-border rounded-lg px-3 py-2 text-sm hover:border-wp-accent transition-colors"
-            aria-label="Copy propagation node address"
-            >{propAddrCopied ? "Copied!" : "Copy"}</button
+            aria-label={t("settings.copy_prop_aria")}
+            >{propAddrCopied ? t("common.copied") : t("common.copy")}</button
           >
         </div>
       </div>
       {#if Boolean($settings.host_propagation_node)}
         <p class="text-xs text-wp-warn mt-2">
-          Keep this machine online. Messages are stored encrypted, but their
-          timing and size are visible to you as the operator.
+          {t("settings.host_warn")}
         </p>
       {/if}
       {#if hostNote}
@@ -362,7 +374,7 @@
 
   {#if $mode === "advanced"}
     <section class="bg-wp-panel border border-wp-border rounded-xl p-5 mb-4">
-      <h2 class="font-semibold mb-1">Glossary</h2>
+      <h2 class="font-semibold mb-1">{t("settings.glossary")}</h2>
       <dl class="text-sm space-y-2 mt-2">
         {#each Object.entries(GLOSSARY) as [term, def] (term)}
           <div>
@@ -375,10 +387,13 @@
   {/if}
 
   {#if restartNote}
-    <p class="text-sm text-wp-warn">Restart required for connection changes.</p>
+    <p class="text-sm text-wp-warn">{t("settings.restart_required")}</p>
   {/if}
 
   <p class="text-xs text-wp-dim mt-6">
-    MeshDeck v{$status?.version ?? "…"} · uptime {$status ? Math.round($status.uptime_seconds) : 0}s
+    {t("settings.footer", {
+      version: $status?.version ?? "…",
+      seconds: $status ? Math.round($status.uptime_seconds) : 0,
+    })}
   </p>
 </div>

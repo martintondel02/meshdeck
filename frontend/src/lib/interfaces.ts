@@ -18,13 +18,11 @@ export interface InterfaceEntry {
   gateway_mode?: boolean;
 }
 
-export const KIND_LABELS: Record<InterfaceKind, string> = {
-  auto: "Local network (auto-discover)",
-  tcp_server: "TCP server (host for others)",
-  tcp_client: "TCP client (connect out)",
-  backbone_server: "Backbone gateway (public entrypoint)",
-  backbone_client: "Backbone client (fast connect)",
-};
+import { t } from "./i18n";
+
+export function kindLabel(kind: InterfaceKind): string {
+  return t(`interfaces.kind_${kind}`);
+}
 
 /** Parse a pasted Reticulum config fragment into interface entries. */
 export function parseSnippet(text: string): InterfaceEntry[] {
@@ -49,7 +47,7 @@ export function parseSnippet(text: string): InterfaceEntry[] {
         entries.push({
           kind:
             type === "TCPClientInterface" ? "tcp_client" : "backbone_client",
-          name: currentName || `Imported ${type}`,
+          name: currentName || t("interfaces.imported_generic", { type }),
           enabled,
           target_host: host,
           target_port: targetPort,
@@ -58,7 +56,7 @@ export function parseSnippet(text: string): InterfaceEntry[] {
       if (listenIp && port)
         entries.push({
           kind: "tcp_server",
-          name: currentName || "Imported TCP server",
+          name: currentName || t("interfaces.imported_tcp_server"),
           enabled,
           listen_ip: listenIp,
           port,
@@ -67,7 +65,7 @@ export function parseSnippet(text: string): InterfaceEntry[] {
       if (host && targetPort) {
         entries.push({
           kind: "backbone_client",
-          name: currentName || "Imported backbone client",
+          name: currentName || t("interfaces.imported_backbone_client"),
           enabled,
           target_host: host,
           target_port: targetPort,
@@ -75,7 +73,7 @@ export function parseSnippet(text: string): InterfaceEntry[] {
       } else if (listenIp && port) {
         entries.push({
           kind: "backbone_server",
-          name: currentName || "Imported backbone gateway",
+          name: currentName || t("interfaces.imported_backbone_gateway"),
           enabled,
           listen_ip: listenIp,
           port,

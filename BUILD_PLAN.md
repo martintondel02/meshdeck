@@ -769,6 +769,11 @@ kill-the-host integration test and a browser run of the cached/stale badges.
 **Phase 4 remaining:** `/media` handler (image conversion needs Pillow;
 deferred), executable pages (deliberately not supported).
 
+**P5.3 done (2026-10-18):** i18n scaffolding — all UI copy extracted to
+`lib/i18n/en.ts`, dependency-free `t()` with interpolation/per-key fallback,
+`de.ts` fallback proof (37 frontend tests), docs/i18n.md. Runtime locale
+switching needs a reload (documented); backend error codes stay machine codes.
+
 **P4.3 done (2026-10-18):** propagation-node hosting. `host_propagation_node`
 is live-applied via `LXMRouter.enable_propagation()`/`disable_propagation()`;
 status exposes the flag and the stable propagation address; advanced Settings

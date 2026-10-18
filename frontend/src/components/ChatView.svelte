@@ -15,6 +15,7 @@
   import { wsCmd } from "../lib/ws";
   import Tooltip from "./Tooltip.svelte";
   import { TOOLTIPS } from "../lib/copy/tooltips";
+  import { t } from "../lib/i18n";
 
   const MAX_ATTACHMENT_BYTES = 1536 * 1024; // must match the backend cap
 
@@ -78,13 +79,13 @@
   function stateLabel(msg: ChatMessage): string {
     switch (msg.state) {
       case "sending":
-        return "sending";
+        return t("chats.state_sending");
       case "sent":
-        return "sent";
+        return t("chats.state_sent");
       case "delivered":
-        return "delivered";
+        return t("chats.state_delivered");
       case "failed":
-        return "failed to send";
+        return t("chats.state_failed");
       default:
         return "";
     }
@@ -105,10 +106,10 @@
 
   function sendErrorText(code: string): string {
     if (code === "no_path") return TOOLTIPS.no_path_error;
-    if (code === "too_large") return "This file is too large for the current transfer limit.";
+    if (code === "too_large") return t("chats.error_too_large");
     if (code === "no_propagation_node")
-      return "Propagation delivery selected, but no propagation node is configured (Advanced→Settings).";
-    return "Message failed before it could be sent.";
+      return t("chats.error_no_propagation_node");
+    return t("chats.error_generic");
   }
 
   function optimisticMessage(
@@ -152,7 +153,7 @@
         draft = "";
       }
     } catch {
-      sendError = "Not connected to the MeshDeck daemon.";
+      sendError = t("chats.error_not_connected");
     } finally {
       sending = false;
     }
@@ -164,7 +165,11 @@
     input.value = ""; // allow re-selecting the same file
     if (!file || !$activePeer || fileSending) return;
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      sendError = `“${file.name}” is ${humanSize(file.size)} — the current limit is ${humanSize(MAX_ATTACHMENT_BYTES)}.`;
+      sendError = t("chats.error_file_too_large", {
+        name: file.name,
+        size: humanSize(file.size),
+        limit: humanSize(MAX_ATTACHMENT_BYTES),
+      });
       return;
     }
     fileSending = true;
@@ -201,7 +206,7 @@
   <div class="h-full flex items-center justify-center text-wp-dim text-sm p-8 text-center">
     <div>
       <div class="text-4xl mb-3">🛰️</div>
-      Select a peer to start chatting,<br />or share your address and wait for someone to say hi.
+      {t("chats.empty_first")}<br />{t("chats.empty_second")}
     </div>
   </div>
 {:else}
@@ -214,20 +219,25 @@
         <span
           class="ml-2 text-[10px] uppercase tracking-wide bg-wp-warn/15 text-wp-warn
                  border border-wp-warn/40 rounded-full px-2 py-0.5"
-          >stamp {peer.stamp_cost}</span
+          >{t("chats.stamp_badge", { cost: peer.stamp_cost })}</span
         >
         <Tooltip text={TOOLTIPS.stamp_sending} />
       {/if}
       <div class="flex-1"></div>
       <input
         bind:value={search}
-        aria-label="Search message history"
-        placeholder="Search history…"
+        aria-label={t("chats.search_aria")}
+        placeholder={t("chats.search_placeholder")}
         class="w-44 bg-wp-bg border border-wp-border rounded-lg px-3 py-1 text-xs
                focus:outline-none focus:border-wp-accent"
       />
       {#if query}
-        <span class="text-[11px] text-wp-dim">{msgs.length} match{msgs.length === 1 ? "" : "es"}</span>
+        <span class="text-[11px] text-wp-dim"
+          >{t(
+            msgs.length === 1 ? "chats.matches_one" : "chats.matches_other",
+            { count: msgs.length },
+          )}</span
+        >
       {/if}
     </div>
 
@@ -248,10 +258,10 @@
                 href="{attachmentUrl(peer.hash, msg, att.index)}?token={getToken()}"
                 class="flex items-center gap-2 mt-1.5 px-3 py-2 rounded-lg bg-wp-bg/60
                        border border-wp-border hover:border-wp-accent transition-colors group"
-                title="Download {att.name}"
+                title={t("chats.download_title", { name: att.name })}
               >
                 <span class="text-base" aria-hidden="true">📎</span>
-                <span class="sr-only">Download attachment: </span>
+                <span class="sr-only">{t("chats.download_attachment")} </span>
                 <span class="truncate font-mono text-xs">{att.name}</span>
                 <span class="text-[11px] text-wp-dim shrink-0">{humanSize(att.size)}</span>
                 <span
@@ -302,20 +312,20 @@
         onclick={() => fileInput?.click()}
         disabled={fileSending}
         aria-label={fileSending
-          ? "Sending attachment…"
-          : `Attach a file (up to ${humanSize(MAX_ATTACHMENT_BYTES)})`}
+          ? t("chats.attaching")
+          : t("chats.attach_aria", { limit: humanSize(MAX_ATTACHMENT_BYTES) })}
         aria-busy={fileSending}
         class="bg-wp-panel2 border border-wp-border rounded-xl px-3.5 py-2.5
                hover:border-wp-accent transition disabled:opacity-40"
-        title="Send a file (up to {humanSize(MAX_ATTACHMENT_BYTES)})"
+        title={t("chats.attach_title", { limit: humanSize(MAX_ATTACHMENT_BYTES) })}
       >
         <span aria-hidden="true">{fileSending ? "⏳" : "📎"}</span>
       </button>
       <input
         bind:value={draft}
-        aria-label="Message text (Enter to send)"
+        aria-label={t("chats.message_aria")}
         onkeydown={(e) => e.key === "Enter" && send()}
-        placeholder="Type a message… (or attach a file)"
+        placeholder={t("chats.message_placeholder")}
         class="flex-1 bg-wp-bg border border-wp-border rounded-xl px-4 py-2.5
                focus:outline-none focus:border-wp-accent transition-colors"
       />
@@ -324,7 +334,7 @@
         disabled={sending || !draft.trim()}
         class="bg-wp-accent text-wp-bg font-semibold rounded-xl px-5
                hover:brightness-110 transition disabled:opacity-40"
-        >Send</button
+        >{t("chats.send")}</button
       >
     </div>
   </div>

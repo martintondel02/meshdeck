@@ -13,6 +13,15 @@ All notable changes to MeshDeck. Format based on Keep a Changelog.
   `propagation_hosting` and `propagation_node_hash`.
 - `docs/guides/hosting-infrastructure.md` plus a built-in Guides section.
 
+### Added (Phase 5 — i18n scaffolding)
+
+- Every user-facing string now lives in `frontend/src/lib/i18n/en.ts` and is
+  rendered through a tiny dependency-free `t()` with `{placeholder}`
+  interpolation, explicit plural keys, and per-key fallback to English.
+  `tooltips.ts` is a thin re-export; components, `timeAgo()` and interface
+  labels are migrated. `docs/i18n.md` explains how to add a locale;
+  a deliberate 3-key `de.ts` proves fallback in the test suite.
+
 ### Added (Phase 5 — docs & first impressions)
 
 - Rewritten README with a basic/advanced feature table, quick start, honest

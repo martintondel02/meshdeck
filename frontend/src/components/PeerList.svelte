@@ -5,6 +5,7 @@
   import type { Peer } from "../lib/stores";
   import Tooltip from "./Tooltip.svelte";
   import { TOOLTIPS } from "../lib/copy/tooltips";
+  import { t } from "../lib/i18n";
 
   let showAdd = $state(false);
   let addInput = $state("");
@@ -32,9 +33,17 @@
   }
 
   function rowLabel(peer: Peer): string {
-    const seen = isRecentlySeen(peer.hash) ? "seen recently" : "not seen recently";
+    const seen = isRecentlySeen(peer.hash)
+      ? t("common.seen_recently")
+      : t("common.not_seen_recently");
     const unreadCount = $unread[peer.hash] ?? 0;
-    return `Open chat with ${peerLabel(peer)} (${seen})${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`;
+    return unreadCount > 0
+      ? t("chats.row_label_unread", {
+          peer: peerLabel(peer),
+          seen,
+          count: unreadCount,
+        })
+      : t("chats.row_label", { peer: peerLabel(peer), seen });
   }
 
   // Inline add-peer form behaves as a small dialog: first field on open, Tab
@@ -154,13 +163,13 @@
         { method: "POST", body: JSON.stringify({ hash: addInput.trim() }) },
       );
       addHint = res.known
-        ? "Added — you can message them right away."
-        : "Added. We asked the network for a path; you're set once they announce (usually within a minute).";
+        ? t("chats.add_ok_known")
+        : t("chats.add_ok_pending");
       addInput = "";
       peers.set(await api<Peer[]>("/api/v1/peers"));
       addField?.focus();
     } catch {
-      addError = "Not a valid address. It should be a 32-character hexadecimal hash.";
+      addError = t("chats.add_invalid");
     } finally {
       addBusy = false;
     }
@@ -190,17 +199,17 @@
 <div class="h-full flex flex-col">
   <div class="px-4 py-3 border-b border-wp-border flex items-center justify-between">
     <h2 class="font-semibold text-sm tracking-wide text-wp-dim uppercase">
-      Peers
+      {t("chats.peers_title")}
       <Tooltip text={TOOLTIPS.peer_hash} />
     </h2>
     <button
       bind:this={addTrigger}
       class="text-wp-dim hover:text-wp-accent text-lg leading-none px-2"
       type="button"
-      aria-label="Add a peer by address"
+      aria-label={t("chats.add_peer_aria")}
       aria-expanded={showAdd}
       aria-controls="add-peer-form"
-      title="Add peer by address"
+      title={t("chats.add_peer_title")}
       onclick={() => (showAdd ? closeAdd() : openAdd())}
     >
       <span aria-hidden="true">＋</span>
@@ -212,20 +221,20 @@
       id="add-peer-form"
       class="border-b border-wp-border/50"
       role="dialog"
-      aria-label="Add a peer by address"
+      aria-label={t("chats.add_peer_aria")}
       tabindex="-1"
       onkeydown={onAddKeydown}
     >
       <form bind:this={addForm} class="px-3 py-3 space-y-2" onsubmit={submitAdd}>
         <div class="flex items-center gap-1 text-xs text-wp-dim font-semibold">
-          Add by address
+          {t("chats.add_by_address")}
           <Tooltip text={TOOLTIPS.add_peer} />
         </div>
         <input
           bind:this={addField}
           bind:value={addInput}
-          aria-label="Peer address, 32-character hexadecimal hash"
-          placeholder="32-character hash…"
+          aria-label={t("chats.add_hash_aria")}
+          placeholder={t("common.hash_placeholder")}
           autocomplete="off"
           spellcheck="false"
           class="w-full bg-wp-bg border border-wp-border rounded-lg px-3 py-2 font-mono text-xs
@@ -236,7 +245,7 @@
           disabled={addBusy || addInput.trim().length < 10}
           class="w-full bg-wp-accent text-wp-bg text-xs font-semibold rounded-lg py-2
                  hover:brightness-110 transition disabled:opacity-40"
-          >Add peer</button
+          >{t("chats.add_peer_submit")}</button
         >
         {#if addHint}<div class="text-[11px] text-wp-accent">{addHint}</div>{/if}
         {#if addError}<div class="text-[11px] text-wp-danger">{addError}</div>{/if}
@@ -249,13 +258,12 @@
 
   {#if $peers.length === 0}
     <div class="p-4 text-sm text-wp-dim leading-relaxed">
-      <p class="mb-2">No peers discovered yet.</p>
+      <p class="mb-2">{t("chats.no_peers")}</p>
       <p class="mb-2">
-        MeshDeck finds people automatically when they
-        <em>announce</em>
+        {t("chats.no_peers_body_before")}
+        <em>{t("chats.no_peers_body_announce")}</em>
         <Tooltip text={TOOLTIPS.announce} />
-        themselves. Share your address (top bar) with a friend running MeshDeck,
-        MeshChat, or Sideband to get started — or press ＋ to add someone directly.
+        {t("chats.no_peers_body_after")}
       </p>
     </div>
   {:else}
@@ -288,21 +296,23 @@
               class="w-2 h-2 rounded-full shrink-0
                      {isRecentlySeen(peer.hash) ? 'bg-wp-accent' : 'bg-wp-border'}"
               aria-hidden="true"
-              title={isRecentlySeen(peer.hash) ? 'seen recently' : 'not seen recently'}
+              title={isRecentlySeen(peer.hash)
+                ? t("common.seen_recently")
+                : t("common.not_seen_recently")}
             ></span>
             <span class="flex-1 min-w-0">
               {#if renameFor === peer.hash}
                 <input
                   bind:this={renameInput}
                   bind:value={renameValue}
-                  aria-label={`Nickname for ${peerLabel(peer)}`}
+                  aria-label={t("chats.nickname_aria", { peer: peerLabel(peer) })}
                   onkeydown={(e) => {
                     e.stopPropagation();
                     if (e.key === "Enter") void saveRename(peer.hash);
                     if (e.key === "Escape") cancelRename(peer.hash);
                   }}
                   onclick={(e) => e.stopPropagation()}
-                  placeholder="Nickname…"
+                  placeholder={t("chats.nickname_placeholder")}
                   class="w-full bg-wp-bg border border-wp-accent rounded px-2 py-0.5 text-xs
                          focus:outline-none"
                 />
@@ -310,7 +320,7 @@
                 <span class="block truncate font-medium">{peerLabel(peer)}</span>
                 <span class="block truncate text-xs text-wp-dim"
                   >{timeAgo(peer.last_seen)}
-                  {#if peer.stamp_cost}· stamp {peer.stamp_cost}{/if}</span
+                  {#if peer.stamp_cost}· {t("chats.stamp_badge", { cost: peer.stamp_cost })}{/if}</span
                 >
               {/if}
             </span>
@@ -323,11 +333,11 @@
             <button
               class="text-wp-dim hover:text-wp-text px-1 shrink-0"
               type="button"
-              aria-label={`Options for ${peerLabel(peer)}`}
+              aria-label={t("chats.options_aria", { peer: peerLabel(peer) })}
               aria-haspopup="menu"
               aria-expanded={menuFor === peer.hash}
               aria-controls={`peer-menu-${peer.hash}`}
-              title="Peer options"
+              title={t("chats.options_title")}
               onkeydown={(e) => e.stopPropagation()}
               onclick={(e) => toggleMenu(peer.hash, e)}
             >
@@ -341,7 +351,7 @@
               class="absolute right-2 top-9 z-20 bg-wp-panel2 border border-wp-border
                      rounded-lg shadow-xl text-xs py-1 min-w-32"
               role="menu"
-              aria-label={`Options for ${peerLabel(peer)}`}
+              aria-label={t("chats.options_aria", { peer: peerLabel(peer) })}
               tabindex="-1"
               onkeydown={onMenuKeydown}
             >
@@ -350,14 +360,14 @@
                 type="button"
                 role="menuitem"
                 tabindex="-1"
-                onclick={() => openRename(peer)}>Rename…</button
+                onclick={() => openRename(peer)}>{t("chats.rename")}</button
               >
               <button
                 class="block w-full text-left px-3 py-1.5 hover:bg-wp-bg text-wp-danger"
                 type="button"
                 role="menuitem"
                 tabindex="-1"
-                onclick={() => blockPeer(peer.hash)}>Block</button
+                onclick={() => blockPeer(peer.hash)}>{t("chats.block")}</button
               >
             </div>
           {/if}

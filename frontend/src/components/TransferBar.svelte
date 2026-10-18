@@ -1,11 +1,14 @@
 <script lang="ts">
   import type { Transfer } from "../lib/stores";
+  import { t } from "../lib/i18n";
 
   let { transfer }: { transfer: Transfer | undefined } = $props();
 
   const pct = $derived(Math.round((transfer?.progress ?? 0) * 100));
   const label = $derived(
-    transfer?.done ? "transfer complete" : `downloading… ${pct}%`,
+    transfer?.done
+      ? t("common.transfer_complete")
+      : t("common.downloading_percent", { percent: pct }),
   );
 </script>
 

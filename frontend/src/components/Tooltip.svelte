@@ -4,6 +4,8 @@
 </script>
 
 <script lang="ts">
+  import { t } from "../lib/i18n";
+
   let { text, topic }: { text: string; topic?: string } = $props();
   const tipId = `tooltip-${++tipCounter}`;
 </script>
@@ -19,7 +21,7 @@
            focus-visible:text-wp-accent focus-visible:border-wp-accent transition-colors
            cursor-help"
     role="button"
-    aria-label={topic ? `Help: ${topic}` : "Help"}
+    aria-label={topic ? t("common.help_topic", { topic }) : t("common.help")}
     aria-describedby={tipId}
     tabindex="0">?</span
   >

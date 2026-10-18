@@ -22,13 +22,14 @@
   import Guides from "./components/Guides.svelte";
   import Settings from "./components/Settings.svelte";
   import { TOOLTIPS } from "./lib/copy/tooltips";
+  import { t } from "./lib/i18n";
 
   type View = "chats" | "pages" | "guides" | "settings";
-  const TABS: { id: View; label: string }[] = [
-    { id: "chats", label: "Chats" },
-    { id: "pages", label: "Pages" },
-    { id: "guides", label: "Guides" },
-    { id: "settings", label: "Settings" },
+  const TABS: { id: View; labelKey: string }[] = [
+    { id: "chats", labelKey: "common.nav_chats" },
+    { id: "pages", labelKey: "common.nav_pages" },
+    { id: "guides", labelKey: "common.nav_guides" },
+    { id: "settings", labelKey: "common.nav_settings" },
   ];
   let view = $state<View>("chats");
   let needsOnboarding = $state(false);
@@ -41,13 +42,13 @@
 
   const connectionText = $derived(
     $connected
-      ? "Connected to the MeshDeck daemon."
-      : "Daemon connection lost — reconnecting.",
+      ? t("common.connected_daemon")
+      : t("common.daemon_lost"),
   );
 
   // WAI-ARIA tabs: roving tabindex, arrow keys move between tabs.
   function onTabKeydown(e: KeyboardEvent) {
-    const i = TABS.findIndex((t) => t.id === view);
+    const i = TABS.findIndex((item) => item.id === view);
     let next = i;
     if (e.key === "ArrowRight") next = (i + 1) % TABS.length;
     else if (e.key === "ArrowLeft") next = (i - 1 + TABS.length) % TABS.length;
@@ -64,8 +65,7 @@
   onMount(async () => {
     captureTokenFromUrl();
     if (!getToken()) {
-      bootError =
-        "No API token found. Start MeshDeck from the terminal and open the full URL it prints (it contains ?token=…).";
+      bootError = t("common.boot_no_token");
       booted = true;
       return;
     }
@@ -85,8 +85,8 @@
     } catch (e) {
       bootError =
         e instanceof Error && e.message === "unauthorized"
-          ? "The daemon rejected the token. Re-open the exact URL MeshDeck printed."
-          : "Could not reach the MeshDeck daemon. Is it running?";
+          ? t("common.boot_bad_token")
+          : t("common.boot_unreachable");
     }
     booted = true;
   });
@@ -104,7 +104,7 @@
 
 {#if !booted}
   <div class="min-h-screen flex items-center justify-center text-wp-dim" role="status">
-    Starting…
+    {t("common.starting")}
   </div>
 {:else if bootError}
   <div class="min-h-screen flex items-center justify-center p-6">
@@ -125,7 +125,9 @@
       <span
         class="w-2 h-2 rounded-full {$connected ? 'bg-wp-accent' : 'bg-wp-danger'}"
         aria-hidden="true"
-        title={$connected ? 'connected to daemon' : 'daemon connection lost — retrying'}
+        title={$connected
+          ? t("common.daemon_connected_title")
+          : t("common.daemon_lost_title")}
       ></span>
       <span class="sr-only" role="status" aria-live="polite">{connectionText}</span>
 
@@ -139,7 +141,7 @@
       </code>
       <Tooltip text={TOOLTIPS.address} />
 
-      <nav class="ml-2" aria-label="Main sections">
+      <nav class="ml-2" aria-label={t("common.main_sections")}>
         <div class="flex gap-1" role="tablist">
           {#each TABS as tab (tab.id)}
             <button
@@ -156,13 +158,20 @@
               onclick={() => (view = tab.id)}
               onkeydown={onTabKeydown}
             >
-              {tab.label}
+              {t(tab.labelKey)}
               {#if tab.id === "chats" && totalUnread > 0}
                 <span
                   class="ml-1 bg-wp-accent text-wp-bg text-xs font-bold rounded-full px-1.5"
                   aria-hidden="true">{totalUnread}</span
                 >
-                <span class="sr-only">{totalUnread} unread messages</span>
+                <span class="sr-only"
+                  >{t(
+                    totalUnread === 1
+                      ? "common.unread_messages_one"
+                      : "common.unread_messages_other",
+                    { count: totalUnread },
+                  )}</span
+                >
               {/if}
             </button>
           {/each}

@@ -18,6 +18,7 @@
   import { renderMicron } from "../lib/micron";
   import { timeAgo } from "../lib/format";
   import { TOOLTIPS } from "../lib/copy/tooltips";
+  import { t } from "../lib/i18n";
 
   // editor state
   let activePage = $state<string | null>(null);
@@ -90,7 +91,7 @@
       dirty = false;
       edMsg = "";
     } catch {
-      edMsg = "could not load page";
+      edMsg = t("pages.error_load");
     }
   }
 
@@ -107,7 +108,7 @@
       await openPage(name);
       pages.set(await api<PageMeta[]>("/api/v1/pages"));
     } catch (e) {
-      edMsg = e instanceof Error ? e.message : "failed";
+      edMsg = e instanceof Error ? e.message : t("common.failed");
     }
   }
 
@@ -120,15 +121,15 @@
         body: JSON.stringify({ content: editor }),
       });
       dirty = false;
-      edMsg = "saved ✓ — the page is live immediately";
+      edMsg = t("pages.saved");
       pages.set(await api<PageMeta[]>("/api/v1/pages"));
     } catch (e) {
-      edMsg = e instanceof Error ? e.message : "save failed";
+      edMsg = e instanceof Error ? e.message : t("pages.error_save");
     }
   }
 
   async function removePage(name: string) {
-    if (!confirm(`Delete page ${name}?`)) return;
+    if (!confirm(t("pages.confirm_delete", { name }))) return;
     await api(`/api/v1/pages/${encodeURIComponent(name)}`, { method: "DELETE" });
     if (activePage === name) {
       activePage = null;
@@ -146,10 +147,10 @@
       });
       nodeInfo.set(info);
       hostMsg = serve
-        ? "announced ✓ — other nodes can find your pages"
-        : "saved (serving off)";
+        ? t("pages.announced")
+        : t("pages.saved_serving_off");
     } catch (e) {
-      hostMsg = e instanceof Error ? e.message : "announce failed";
+      hostMsg = e instanceof Error ? e.message : t("pages.error_announce");
     }
   }
 
@@ -224,11 +225,11 @@
     const code = e instanceof Error ? e.message : "";
     switch (code) {
       case "no_path":
-        return "no route to that node yet — it may be offline; a path request was sent, try again in a minute";
+        return t("pages.error_no_path");
       case "link_timeout":
-        return "timed out while connecting to the node";
+        return t("pages.error_timeout");
       default:
-        return code || "fetch failed";
+        return code || t("pages.error_fetch");
     }
   }
 
@@ -249,22 +250,22 @@
   async function uploadShared(file: File) {
     sharedMsg = "";
     if (file.size > 32 * 1024 * 1024) {
-      sharedMsg = "file is larger than 32 MiB";
+      sharedMsg = t("pages.error_file_too_big");
       return;
     }
     const form = new FormData();
     form.append("file", file);
     try {
       await uploadFile("/api/v1/shared", form);
-      sharedMsg = "shared ✓ — anyone with your node address can download it";
+      sharedMsg = t("pages.shared_ok");
       await loadShared();
     } catch (e) {
-      sharedMsg = e instanceof Error ? e.message : "upload failed";
+      sharedMsg = e instanceof Error ? e.message : t("pages.error_upload");
     }
   }
 
   async function unshare(name: string) {
-    if (!confirm(`Stop sharing ${name}?`)) return;
+    if (!confirm(t("pages.confirm_unshare", { name }))) return;
     await api(`/api/v1/shared/${encodeURIComponent(name)}`, { method: "DELETE" });
     await loadShared();
   }
@@ -280,7 +281,7 @@
         `/api/v1/browse/${encodeURIComponent(dlNode.trim())}/file/${encodeURIComponent(name)}?transfer_id=${encodeURIComponent(fileTransferId)}`,
         name,
       );
-      sharedMsg = "download started";
+      sharedMsg = t("pages.download_started");
     } catch (e) {
       sharedMsg = browseErrorText(e);
     } finally {
@@ -290,8 +291,8 @@
 
   function copyText(text: string) {
     navigator.clipboard?.writeText(text).then(
-      () => (sharedMsg = "copied to clipboard"),
-      () => (sharedMsg = "could not copy"),
+      () => (sharedMsg = t("pages.copied")),
+      () => (sharedMsg = t("pages.copy_failed")),
     );
   }
 
@@ -299,10 +300,9 @@
 </script>
 
 <div class="p-6 max-w-5xl mx-auto space-y-8">
-  <h1 class="text-xl font-bold text-wp-text">Pages & Node</h1>
+  <h1 class="text-xl font-bold text-wp-text">{t("pages.title")}</h1>
   <p class="text-wp-dim text-sm -mt-4">
-    Host NomadNet-compat­ible `.mu` pages right from your node — anyone with the
-    node address can browse them, no web server involved.
+    {t("pages.subtitle")}
     <Tooltip text={TOOLTIPS.hosting_pages} />
   </p>
 
@@ -310,11 +310,11 @@
     <!-- editor column -->
     <div class="bg-wp-panel border border-wp-border rounded-xl p-4 space-y-3">
       <h2 class="text-sm font-semibold text-wp-dim uppercase tracking-wide">
-        My pages
+        {t("pages.my_pages")}
       </h2>
       {#if $nodeInfo}
         <div class="text-xs bg-wp-bg border border-wp-border rounded-lg p-2 break-all">
-          node address:
+          {t("pages.node_address")}
           <code class="select-all">{$nodeInfo.node_hash}</code>
         </div>
       {/if}
@@ -322,13 +322,13 @@
       <div class="flex gap-2">
         <input
           bind:value={newName}
-          placeholder="page-name.mu"
+          placeholder={t("common.page_name_placeholder")}
           class="flex-1 bg-wp-bg border border-wp-border rounded-lg px-2 py-1 text-sm"
         />
         <button
           onclick={createPage}
-          aria-label="Create page"
-          title="Create page"
+          aria-label={t("pages.create_page")}
+          title={t("pages.create_page")}
           class="bg-wp-accent text-wp-bg text-sm font-semibold px-3 py-1 rounded-lg"
           >＋</button
         >
@@ -336,8 +336,7 @@
 
       {#if $pages.length === 0}
         <p class="text-wp-dim text-sm">
-          No pages yet — create <code>index.mu</code> to give your node a home
-          page, otherwise visitors see a placeholder.
+          {t("pages.no_pages_before")} <code>index.mu</code> {t("pages.no_pages_after")}
         </p>
       {:else}
         <ul class="space-y-1">
@@ -351,8 +350,8 @@
               >
               <button
                 class="text-wp-dim hover:text-wp-danger text-xs"
-                aria-label={`Delete page ${p.name}`}
-                title="delete"
+                aria-label={t("pages.delete_page_aria", { name: p.name })}
+                title={t("common.delete")}
                 onclick={() => removePage(p.name)}>✕</button
               >
             </li>
@@ -365,19 +364,19 @@
     <div class="md:col-span-2 bg-wp-panel border border-wp-border rounded-xl p-4 space-y-2">
       <div class="flex items-center justify-between">
         <h2 class="text-sm font-semibold text-wp-dim uppercase tracking-wide">
-          {activePage ?? "select or create a page"}
+          {activePage ?? t("pages.select_or_create")}
         </h2>
         {#if activePage}
           <div class="flex gap-2 items-center">
             <button
               class="text-xs text-wp-dim hover:text-wp-text"
               onclick={() => (showPreview = !showPreview)}
-              >{showPreview ? "edit" : "preview"}</button
+              >{showPreview ? t("pages.edit") : t("pages.preview")}</button
             >
             <button
               onclick={savePage}
               class="bg-wp-accent text-wp-bg text-sm font-semibold px-3 py-1 rounded-lg"
-              disabled={!dirty}>Save</button
+              disabled={!dirty}>{t("common.save")}</button
             >
           </div>
         {/if}
@@ -394,7 +393,7 @@
             rows="18"
             spellcheck="false"
             class="w-full bg-wp-bg border border-wp-border rounded-lg p-3 text-sm font-mono"
-            placeholder=">My first page&#10;&#10;Write in micron markup. Quick guide: > heading, - rule, • bullets, `*bold`*, _underline_, [label`link]…"
+            placeholder={t("pages.editor_placeholder")}
           ></textarea>
         {/if}
       {/if}
@@ -407,27 +406,27 @@
   <!-- hosting toggle -->
   <section class="bg-wp-panel border border-wp-border rounded-xl p-4 space-y-3">
     <h2 class="text-sm font-semibold text-wp-dim uppercase tracking-wide">
-      Host my node
+      {t("pages.host_my_node")}
       <Tooltip text={TOOLTIPS.hosting_pages} />
     </h2>
     <div class="flex flex-wrap items-center gap-3">
       <label class="text-sm text-wp-text">
-        Node name:
+        {t("pages.node_name")}
         <input
           bind:value={nodeName}
-          placeholder="My MeshDeck Node"
+          placeholder={t("pages.node_name_placeholder")}
           class="ml-2 bg-wp-bg border border-wp-border rounded-lg px-2 py-1 text-sm"
         />
       </label>
       <label class="flex items-center gap-2 text-sm text-wp-text">
         <input type="checkbox" bind:checked={serve} />
-        Announce my node to the network
+        {t("pages.announce_toggle")}
         <Tooltip text={TOOLTIPS.node_announce} />
       </label>
       <button
         onclick={publish}
         class="bg-wp-accent text-wp-bg text-sm font-semibold px-4 py-1.5 rounded-lg"
-        >Apply & announce</button
+        >{t("pages.apply_announce")}</button
       >
       {#if hostMsg}
         <span class="text-xs text-wp-dim" role="status" aria-live="polite">{hostMsg}</span>
@@ -438,7 +437,7 @@
   <!-- browser -->
   <section class="bg-wp-panel border border-wp-border rounded-xl p-4 space-y-3">
     <h2 class="text-sm font-semibold text-wp-dim uppercase tracking-wide">
-      Browse other nodes
+      {t("pages.browse_nodes")}
       <Tooltip text={TOOLTIPS.node_browse} />
     </h2>
 
@@ -456,15 +455,14 @@
       </div>
     {:else}
       <p class="text-xs text-wp-dim">
-        No nodes discovered yet — discovered nodes appear here automatically
-        after they announce.
+        {t("pages.no_nodes")}
       </p>
     {/if}
 
     <div class="flex flex-wrap gap-2 items-center">
       <input
         bind:value={browseHash}
-        placeholder="node address (hash)"
+        placeholder={t("common.node_address_placeholder")}
         class="flex-1 min-w-64 bg-wp-bg border border-wp-border rounded-lg px-2 py-1 text-sm font-mono"
       />
       <input
@@ -476,7 +474,7 @@
         onclick={browse}
         disabled={browsing || !browseHash.trim()}
         class="bg-wp-accent text-wp-bg text-sm font-semibold px-4 py-1.5 rounded-lg"
-        >{browsing ? "fetching…" : "Open"}</button
+        >{browsing ? t("pages.fetching") : t("pages.open")}</button
       >
     </div>
     {#if browsing && transferId}
@@ -493,7 +491,7 @@
             <button
               class="hover:text-wp-accent"
               onclick={goBack}
-              title="back to the previous page">← back</button
+              title={t("pages.back_title")}>← {t("pages.back")}</button
             >
           {/if}
           {#if pageResult}
@@ -505,13 +503,15 @@
                   : 'text-wp-dim'}"
               >
                 {pageResult.stale
-                  ? "saved copy — node unreachable"
-                  : `cached · ${timeAgo(pageResult.cached_ts)}`}
+                  ? t("pages.cached_stale")
+                  : t("pages.cached_ago", { ago: timeAgo(pageResult.cached_ts) })}
               </span>
             {:else}
               <span
-                >— {pageResult.bytes} bytes, {pageResult.elapsed_ms} ms via
-                on-network link</span
+                >{t("pages.link_stats", {
+                  bytes: pageResult.bytes,
+                  ms: pageResult.elapsed_ms,
+                })}</span
               >
             {/if}
             <button
@@ -519,7 +519,7 @@
               disabled={browsing}
               onclick={() =>
                 fetchPage(browseHash, pageResult?.path ?? browsePath, true)}
-              >Refresh</button
+              >{t("pages.refresh")}</button
             >
           {/if}
         </div>
@@ -535,19 +535,18 @@
   <!-- shared files -->
   <section class="bg-wp-panel border border-wp-border rounded-xl p-4 space-y-3">
     <h2 class="text-sm font-semibold text-wp-dim uppercase tracking-wide">
-      Shared files
+      {t("pages.shared_files")}
       <Tooltip text={TOOLTIPS.shared_files} />
     </h2>
     <p class="text-xs text-wp-dim">
-      Host files on your node (up to 32 MiB each) — anyone who knows your node
-      address can download them, no chat message needed.
+      {t("pages.shared_intro")}
     </p>
 
     <div class="flex flex-wrap items-center gap-3">
       <label
         class="bg-wp-bg border border-wp-border rounded-lg px-3 py-1.5 text-sm cursor-pointer hover:border-wp-accent"
       >
-        ＋ Share a file
+        ＋ {t("pages.share_file")}
         <input
           type="file"
           class="hidden"
@@ -563,13 +562,13 @@
           class="text-xs text-wp-dim hover:text-wp-accent"
           onclick={() =>
             copyText(`${$nodeInfo.node_hash} — /file/<name>`)}
-          >copy node address</button
+          >{t("pages.copy_node_address")}</button
         >
       {/if}
     </div>
 
     {#if shared.length === 0}
-      <p class="text-xs text-wp-dim">Nothing shared yet.</p>
+      <p class="text-xs text-wp-dim">{t("pages.nothing_shared")}</p>
     {:else}
       <ul class="space-y-1">
         {#each shared as f (f.name)}
@@ -579,12 +578,12 @@
             <button
               class="text-xs text-wp-dim hover:text-wp-accent"
               onclick={() => downloadBlob(`/api/v1/shared/${encodeURIComponent(f.name)}`, f.name)}
-              >download</button
+              >{t("pages.download")}</button
             >
             <button
               class="text-wp-dim hover:text-wp-danger text-xs"
-              aria-label={`Stop sharing ${f.name}`}
-              title="stop sharing"
+              aria-label={t("pages.stop_sharing_aria", { name: f.name })}
+              title={t("pages.stop_sharing")}
               onclick={() => unshare(f.name)}>✕</button
             >
           </li>
@@ -593,23 +592,23 @@
     {/if}
 
     <div class="border-t border-wp-border pt-3 space-y-2">
-      <p class="text-xs text-wp-dim">Download from another node:</p>
+      <p class="text-xs text-wp-dim">{t("pages.download_from_node")}</p>
       <div class="flex flex-wrap gap-2 items-center">
         <input
           bind:value={dlNode}
-          placeholder="node address (hash)"
+          placeholder={t("common.node_address_placeholder")}
           class="flex-1 min-w-56 bg-wp-bg border border-wp-border rounded-lg px-2 py-1 text-sm font-mono"
         />
         <input
           bind:value={dlName}
-          placeholder="filename.bin"
+          placeholder={t("common.filename_placeholder")}
           class="w-48 bg-wp-bg border border-wp-border rounded-lg px-2 py-1 text-sm font-mono"
         />
         <button
           onclick={downloadFromNode}
           disabled={fileBusy || !dlNode.trim() || !dlName.trim()}
           class="bg-wp-accent text-wp-bg text-sm font-semibold px-4 py-1.5 rounded-lg"
-          >Get file</button
+          >{t("pages.get_file")}</button
         >
       </div>
       {#if fileBusy && fileTransferId}

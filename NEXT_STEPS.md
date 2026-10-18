@@ -431,7 +431,22 @@ README. Verify by pushing a throwaway commit that breaks a test, then reverting
 (`./meshdeck --version` → version, UI serves). Release notes list install
 methods that are actually verified.
 
-### P5.3 — i18n scaffolding (English-only extraction)
+### P5.3 — i18n scaffolding (English-only extraction)  ✅ DONE
+
+> **Landed (2026-10-18):** `lib/i18n/index.ts` (`t`, `tList`, `$locale`,
+> `setLocale`, per-key fallback, `{name}` interpolation, no dependency);
+> `en.ts` holds every user-facing string (common, chats, pages, settings,
+> guides, onboarding, tooltips, glossary, interfaces); `tooltips.ts` is now a
+> thin re-export; `de.ts` is a deliberate 3-key fake locale proving fallback
+> in 11 vitest cases (37 frontend tests total). All 11 components + App +
+> `format.ts` (timeAgo) + `interfaces.ts` (kind labels/imported names) use
+> `t()`. `docs/i18n.md` documents keys, plurals, fallback and the no-inline-
+> strings rule.
+> **Verified:** `pnpm run check` 0/0, `pnpm run test` 37 passed, build green;
+> browser smoke on a real daemon rendered “Pages & Node”/“Settings” with zero
+> raw i18n keys visible. **Known limitation:** `t()` reads `get(locale)`, so a
+> runtime locale switch needs a reload (no picker exists yet; documented).
+> Backend error codes (e.g. `no_path`) remain machine codes, not translated.
 
 **Why now:** retrofitting translation later is expensive; extraction now is
 mechanical.

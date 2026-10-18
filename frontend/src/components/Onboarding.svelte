@@ -4,6 +4,7 @@
   import { identity } from "../lib/stores";
   import Tooltip from "./Tooltip.svelte";
   import { TOOLTIPS } from "../lib/copy/tooltips";
+  import { t } from "../lib/i18n";
 
   let { onDone }: { onDone: () => void } = $props();
 
@@ -51,12 +52,14 @@
     try {
       const info = await api<typeof $identity>("/api/v1/identity/display_name", {
         method: "POST",
-        body: JSON.stringify({ display_name: name.trim() || "Wanderer" }),
+        body: JSON.stringify({
+          display_name: name.trim() || t("onboarding.default_name"),
+        }),
       });
       identity.set(info);
       onDone();
     } catch (e) {
-      error = e instanceof Error ? e.message : "failed";
+      error = e instanceof Error ? e.message : t("common.failed");
     } finally {
       busy = false;
     }
@@ -75,15 +78,14 @@
     onkeydown={onKeydown}
   >
     <div class="text-3xl mb-1" aria-hidden="true">🧭</div>
-    <h1 id="onboarding-title" class="text-2xl font-bold mb-2">Welcome to MeshDeck</h1>
+    <h1 id="onboarding-title" class="text-2xl font-bold mb-2">{t("onboarding.title")}</h1>
     <p id="onboarding-intro" class="text-wp-dim text-sm mb-6 leading-relaxed">
-      MeshDeck runs your own node on the Reticulum network — fully encrypted,
-      decentralized, and owned by you. Let's set you up in two seconds.
+      {t("onboarding.intro")}
     </p>
 
     <div class="flex items-center mb-1.5">
       <label for="onboarding-name" class="text-sm font-medium">
-        What should others call you?
+        {t("onboarding.name_label")}
       </label>
       <Tooltip text={TOOLTIPS.display_name} />
     </div>
@@ -92,7 +94,7 @@
       bind:this={nameField}
       bind:value={name}
       onkeydown={(e) => e.key === "Enter" && start()}
-      placeholder="e.g. Ada"
+      placeholder={t("onboarding.name_placeholder")}
       autocomplete="nickname"
       class="w-full bg-wp-bg border border-wp-border rounded-lg px-3 py-2.5 mb-4
              focus:outline-none focus:border-wp-accent transition-colors"
@@ -111,12 +113,11 @@
       class="w-full bg-wp-accent text-wp-bg font-semibold rounded-lg py-2.5
              hover:brightness-110 active:scale-[0.99] transition disabled:opacity-50"
     >
-      {busy ? "Creating your identity…" : "Enter the network"}
+      {busy ? t("onboarding.busy") : t("onboarding.submit")}
     </button>
 
     <p class="text-xs text-wp-dim mt-4 leading-relaxed">
-      A cryptographic identity is created for you automatically — no accounts, no
-      phone numbers, no servers to sign up for.
+      {t("onboarding.footnote")}
       <Tooltip text={TOOLTIPS.address} />
     </p>
   </div>
